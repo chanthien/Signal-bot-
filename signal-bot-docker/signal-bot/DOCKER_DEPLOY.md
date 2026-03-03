@@ -146,14 +146,11 @@ PORT=8000
 # ── Optional asset groups ─────────────────────────────────
 ENABLE_MEME_GROUP=false
 
-# ── Service split (signal ↔ executor) ─────────────────────
-EXECUTOR_BASE_URL=http://signal-bot-executor:8010
-
 # ── Docker image (tuỳ chọn override) ─────────────────────
-IMAGE_NAME=signal-bot:local
+IMAGE_NAME=ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest
 ```
 
-> Nếu không set `IMAGE_NAME`, docker-compose sẽ build local image `signal-bot:local` (an toàn cho lần chạy đầu).
+> Nếu không set `IMAGE_NAME`, docker-compose sẽ dùng image mặc định ở trên.
 
 **Cách lấy các giá trị:**
 
@@ -165,7 +162,6 @@ IMAGE_NAME=signal-bot:local
 | `BINGX_API_KEY` | BingX → Account → API Management → Create API |
 | `BINGX_API_SECRET` | Lấy cùng lúc với API key (chỉ hiện 1 lần) |
 | `ENABLE_MEME_GROUP` | `true` để bật thêm nhóm coin rác/alt |
-| `EXECUTOR_BASE_URL` | URL service executor để tách deploy BingX riêng |
 
 ### Bước 3: Tải docker-compose.yml
 
@@ -477,17 +473,3 @@ docker compose logs -f --tail=100
 # hoặc
 journalctl -u signal-bot -f
 ```
-
-
-## 13. TRIỂN KHAI TÁCH SERVICE (PHƯƠNG ÁN B)
-
-Bot đã tách thành 2 service:
-- `signal-bot`: đọc market data + chạy strategy + gửi Telegram
-- `signal-bot-executor`: chỉ xử lý private BingX API (đặt/đóng lệnh)
-
-Mặc định `signal-bot` gọi executor qua `EXECUTOR_BASE_URL`.
-
-### Rollout không gián đoạn
-1. Deploy `signal-bot-executor` ổn định trước.
-2. `signal-bot` vẫn gửi tín hiệu Telegram bình thường trong lúc bạn cập nhật executor ở phiên bản mới (nếu giữ API contract endpoint).
-3. Khi executor healthy, restart `signal-bot` để dùng bản mới.

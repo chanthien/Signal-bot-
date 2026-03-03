@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from config.settings import ASSETS, PORT, validate_runtime_settings
-from execution.gateway import gateway
+from exchange.bingx import bingx
 from notifier.telegram import notifier
 from scheduler.engine import engine
 from utils.logger import log
