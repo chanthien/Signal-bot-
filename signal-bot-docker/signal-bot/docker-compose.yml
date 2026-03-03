@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  signal-bot:
+    image: ghcr.io/${GITHUB_REPO}/signal-bot:latest
+    # Hoặc build local: uncomment dòng dưới, comment dòng image
+    # build: .
+    container_name: signal-bot
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./logs:/app/logs        # persist logs ra ngoài container
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
