@@ -29,10 +29,10 @@ class TestCloseSymbol(unittest.IsolatedAsyncioTestCase):
         old_strategies = main.engine.strategies
         main.engine.strategies = {symbol: DummyStrategy()}
         try:
-            with patch.object(main.gateway, "fetch_ticker", AsyncMock(return_value=105.0)), \
+            with patch.object(main.bingx, "fetch_ticker", AsyncMock(return_value=105.0)), \
                  patch.object(main.engine, "_estimate_pnl_pct", return_value=5.0), \
-                 patch.object(main.gateway, "close_all_positions", AsyncMock(return_value=True)), \
-                 patch.object(main.gateway, "cancel_all_orders", AsyncMock(return_value=True)), \
+                 patch.object(main.bingx, "close_all_positions", AsyncMock(return_value=True)), \
+                 patch.object(main.bingx, "cancel_all_orders", AsyncMock(return_value=True)), \
                  patch.object(main.notifier, "send_close", AsyncMock()) as send_close:
                 response = await main.close_symbol(symbol)
 

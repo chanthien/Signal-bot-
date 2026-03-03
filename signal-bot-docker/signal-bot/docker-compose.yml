@@ -1,6 +1,8 @@
 services:
   signal-bot:
     image: ${IMAGE_NAME:-ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest}
+    # Build local image thay vì pull từ GHCR:
+    # build: .
     container_name: signal-bot
     restart: unless-stopped
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
