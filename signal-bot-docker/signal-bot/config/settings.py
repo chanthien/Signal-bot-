@@ -73,14 +73,14 @@ class AssetConfig:
     tp2_atr_mult:    float = 4.0
 
     # Win rate baseline cho confidence score
-    win_rate_base:   float = 0.55   # H1 baseline cao hơn M15
+    win_rate_base:   float = 0.60   # H1 baseline cao hơn M15
 
 
 # ── Core asset configs ─────────────────────────────────────
 
 CORE_ASSETS: dict[str, AssetConfig] = {
-    "GOLD-USDT": AssetConfig(
-        symbol        = "GOLD-USDT",
+    "XAUT-USDT": AssetConfig(
+        symbol        = "XAUT-USDT",
         display_name  = "XAU/USDT (Vàng)",
         leverage      = 5,
         usdt_per_trade= 10.0,
