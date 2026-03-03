@@ -1,9 +1,7 @@
-version: "3.9"
-
 services:
   signal-bot:
-    image: ghcr.io/${GITHUB_REPO}/signal-bot:latest
-    # Hoặc build local: uncomment dòng dưới, comment dòng image
+    image: ${IMAGE_NAME:-ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest}
+    # Build local image thay vì pull từ GHCR:
     # build: .
     container_name: signal-bot
     restart: unless-stopped
