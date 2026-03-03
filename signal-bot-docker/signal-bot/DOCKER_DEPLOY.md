@@ -129,7 +129,7 @@ cp .env.example .env
 nano .env
 ```
 
-Điền đầy đủ vào `.env`:
+Điền đầy đủ vào `.env` (bot sẽ **không khởi động** nếu thiếu TELEGRAM/BINGX credentials):
 ```env
 # ── Telegram ──────────────────────────────────────────────
 TELEGRAM_TOKEN=1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
@@ -143,9 +143,17 @@ BINGX_API_SECRET=your_secret_here
 # ── Server ────────────────────────────────────────────────
 PORT=8000
 
-# ── GitHub Repo (để docker-compose pull đúng image) ───────
-GITHUB_REPO=YOUR_USERNAME/signal-bot
+# ── Optional asset groups ─────────────────────────────────
+ENABLE_MEME_GROUP=false
+
+# ── Service split (signal ↔ executor) ─────────────────────
+EXECUTOR_BASE_URL=http://signal-bot-executor:8010
+
+# ── Docker image (tuỳ chọn override) ─────────────────────
+IMAGE_NAME=ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest
 ```
+
+> Nếu không set `IMAGE_NAME`, docker-compose sẽ dùng image mặc định ở trên.
 
 **Cách lấy các giá trị:**
 
@@ -156,6 +164,8 @@ GITHUB_REPO=YOUR_USERNAME/signal-bot
 | `MY_CHAT_ID` | Nhắn bot bất kỳ gì → `https://api.telegram.org/bot<TOKEN>/getUpdates` → tìm `"chat":{"id":...}` |
 | `BINGX_API_KEY` | BingX → Account → API Management → Create API |
 | `BINGX_API_SECRET` | Lấy cùng lúc với API key (chỉ hiện 1 lần) |
+| `ENABLE_MEME_GROUP` | `true` để bật thêm nhóm coin rác/alt |
+| `EXECUTOR_BASE_URL` | URL service executor để tách deploy BingX riêng |
 
 ### Bước 3: Tải docker-compose.yml
 
@@ -166,10 +176,9 @@ curl -o docker-compose.yml https://raw.githubusercontent.com/YOUR_USERNAME/signa
 Hoặc tạo tay:
 ```bash
 cat > /opt/signal-bot/docker-compose.yml << 'EOF'
-version: "3.9"
 services:
   signal-bot:
-    image: ghcr.io/${GITHUB_REPO}/signal-bot:latest
+    image: ${IMAGE_NAME:-ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest}
     container_name: signal-bot
     restart: unless-stopped
     ports:
@@ -206,8 +215,12 @@ echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password
 
 ```bash
 cd /opt/signal-bot
+# Nếu dùng image từ GHCR
 docker compose pull
 docker compose up -d
+
+# Nếu muốn build local từ source (không cần GHCR)
+# docker compose up -d --build
 
 # Verify
 docker compose ps
@@ -227,7 +240,7 @@ curl http://localhost:8000/health
 #   "status": "ok",
 #   "balance": 1250.50,
 #   "assets": {
-#     "GOLD-USDT": {"direction": "", "layers": 0, ...},
+#     "XAUT-USDT": {"direction": "", "layers": 0, ...},
 #     "BTC-USDT":  {"direction": "LONG", "layers": 2, ...},
 #     "ETH-USDT":  {"direction": "", "layers": 0, ...}
 #   }
@@ -450,3 +463,31 @@ curl -X POST http://localhost:8000/run-now
 # Close all positions for asset
 curl -X POST http://localhost:8000/close/BTC-USDT
 ```
+
+
+### Debug nhanh lỗi ký lệnh BingX
+
+Nếu log có `Incorrect apiKey` hoặc `Signature verification failed`, kiểm tra theo thứ tự:
+1. API key đúng loại **Futures** và đã bật quyền trade.
+2. Key/secret trong `.env` không có khoảng trắng/newline thừa (copy lại tay nếu cần).
+3. VPS đã `git pull` bản mới rồi restart bot.
+4. Test lại endpoint health và logs:
+```bash
+docker compose logs -f --tail=100
+# hoặc
+journalctl -u signal-bot -f
+```
+
+
+## 13. TRIỂN KHAI TÁCH SERVICE (PHƯƠNG ÁN B)
+
+Bot đã tách thành 2 service:
+- `signal-bot`: đọc market data + chạy strategy + gửi Telegram
+- `signal-bot-executor`: chỉ xử lý private BingX API (đặt/đóng lệnh)
+
+Mặc định `signal-bot` gọi executor qua `EXECUTOR_BASE_URL`.
+
+### Rollout không gián đoạn
+1. Deploy `signal-bot-executor` ổn định trước.
+2. `signal-bot` vẫn gửi tín hiệu Telegram bình thường trong lúc bạn cập nhật executor ở phiên bản mới (nếu giữ API contract endpoint).
+3. Khi executor healthy, restart `signal-bot` để dùng bản mới.

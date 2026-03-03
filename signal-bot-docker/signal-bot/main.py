@@ -14,8 +14,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from config.settings import ASSETS, PORT
-from exchange.bingx import bingx
+from config.settings import ASSETS, PORT, validate_runtime_settings
+from execution.gateway import gateway
 from notifier.telegram import notifier
 from scheduler.engine import engine
 from utils.logger import log
@@ -86,6 +86,12 @@ async def _daily_summary_loop():
 async def lifespan(app: FastAPI):
     log.info("bot.starting")
 
+    missing = validate_runtime_settings()
+    if missing:
+        msg = f"Missing required settings: {', '.join(missing)}"
+        log.error("config.missing_required", missing=missing)
+        raise RuntimeError(msg)
+
     # Start background tasks
     engine_task   = asyncio.create_task(engine.start())
     heartbeat     = asyncio.create_task(_heartbeat_loop())
@@ -122,7 +128,7 @@ async def health():
             "avg_entry"   : round(s.avg_entry, 4),
             "trail_active": s.trail_active,
         }
-    balance = await bingx.get_balance()
+    balance = await gateway.get_balance()
     return JSONResponse({
         "status" : "ok",
         "balance": balance,
@@ -136,7 +142,7 @@ async def asset_status(symbol: str):
     if symbol not in engine.strategies:
         return JSONResponse({"error": "unknown symbol"}, status_code=404)
     s = engine.strategies[symbol].state
-    current = await bingx.fetch_ticker(symbol)
+    current = await gateway.fetch_ticker(symbol)
     pnl = engine._estimate_pnl_pct(s, current) if current > 0 else 0.0
     return JSONResponse({
         "symbol"      : symbol,
@@ -159,16 +165,17 @@ async def close_symbol(symbol: str):
 
     strategy = engine.strategies[symbol]
     state    = strategy.state
-    current  = await bingx.fetch_ticker(symbol)
+    current  = await gateway.fetch_ticker(symbol)
     pnl      = engine._estimate_pnl_pct(state, current)
+    close_direction = state.direction or "ALL"
 
-    ok = await bingx.close_all_positions(symbol)
-    await bingx.cancel_all_orders(symbol)
+    ok = await gateway.close_all_positions(symbol)
+    await gateway.cancel_all_orders(symbol)
     state.reset()
 
     await notifier.send_close(
         ASSETS[symbol].display_name,
-        state.direction or "ALL",
+        close_direction,
         "Manual Close",
         pnl, ok
     )
