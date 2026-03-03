@@ -14,7 +14,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from config.settings import ASSETS, PORT
+from config.settings import ASSETS, PORT, validate_runtime_settings
 from exchange.bingx import bingx
 from notifier.telegram import notifier
 from scheduler.engine import engine
@@ -85,6 +85,12 @@ async def _daily_summary_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("bot.starting")
+
+    missing = validate_runtime_settings()
+    if missing:
+        msg = f"Missing required settings: {', '.join(missing)}"
+        log.error("config.missing_required", missing=missing)
+        raise RuntimeError(msg)
 
     # Start background tasks
     engine_task   = asyncio.create_task(engine.start())
@@ -161,6 +167,7 @@ async def close_symbol(symbol: str):
     state    = strategy.state
     current  = await bingx.fetch_ticker(symbol)
     pnl      = engine._estimate_pnl_pct(state, current)
+    close_direction = state.direction or "ALL"
 
     ok = await bingx.close_all_positions(symbol)
     await bingx.cancel_all_orders(symbol)
@@ -168,7 +175,7 @@ async def close_symbol(symbol: str):
 
     await notifier.send_close(
         ASSETS[symbol].display_name,
-        state.direction or "ALL",
+        close_direction,
         "Manual Close",
         pnl, ok
     )
