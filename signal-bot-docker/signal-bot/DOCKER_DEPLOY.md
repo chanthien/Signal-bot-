@@ -125,7 +125,7 @@ cd /opt/signal-bot
 
 # Tải .env template
 curl -o .env.example https://raw.githubusercontent.com/YOUR_USERNAME/signal-bot/main/.env.example
-cp .env.example .env
+cp --update=none .env.example .env
 nano .env
 ```
 
