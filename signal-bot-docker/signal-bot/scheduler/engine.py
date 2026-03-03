@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT
-from exchange.bingx import bingx, BingXClient
+from execution.gateway import gateway
 from notifier.telegram import notifier
 from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState
 from utils.logger import log
@@ -68,7 +68,7 @@ class TradingEngine:
     async def _run_asset(self, symbol: str, cfg: AssetConfig) -> None:
         try:
             # Fetch OHLCV
-            df = await bingx.fetch_ohlcv(symbol, CANDLE_INTERVAL, CANDLE_LIMIT)
+            df = await gateway.fetch_ohlcv(symbol, CANDLE_INTERVAL, CANDLE_LIMIT)
             if df.empty:
                 log.warning("engine.empty_ohlcv", symbol=symbol)
                 return
@@ -115,13 +115,13 @@ class TradingEngine:
 
         # Set leverage once per session (if not already set)
         if state.layers == 0:
-            await bingx.set_leverage(symbol, cfg.leverage)
+            await gateway.set_leverage(symbol, cfg.leverage)
 
         # ── FLAT / REVERSAL: close all ────────────────────────────────
         if signal.action == "FLAT":
             if state.layers > 0:
-                ok = await bingx.close_all_positions(symbol)
-                await bingx.cancel_all_orders(symbol)
+                ok = await gateway.close_all_positions(symbol)
+                await gateway.cancel_all_orders(symbol)
                 pnl_pct = self._estimate_pnl_pct(state, signal.price)
                 if ok:
                     executed = True
@@ -148,7 +148,7 @@ class TradingEngine:
             qty = self._calc_qty(cfg, signal.price, layer=signal.layer)
             p_side = "LONG" if signal.direction == "LONG" else "SHORT"
             side   = "BUY"  if signal.direction == "LONG" else "SELL"
-            order  = await bingx.place_order(symbol, side, p_side, qty)
+            order  = await gateway.place_order(symbol, side, p_side, qty)
             if order:
                 executed = True
                 order_id = str(order.get("orderId", ""))
@@ -170,7 +170,7 @@ class TradingEngine:
                 qty    = state.sizes[-1]
                 p_side = "LONG" if signal.direction == "LONG" else "SHORT"
                 side   = "SELL" if signal.direction == "LONG" else "BUY"
-                order  = await bingx.place_order(
+                order  = await gateway.place_order(
                     symbol, side, p_side, qty, reduce_only=True
                 )
                 if order:
@@ -198,7 +198,7 @@ class TradingEngine:
         p_side   = "LONG" if signal.direction == "LONG" else "SHORT"
         side     = "BUY"  if signal.direction == "LONG" else "SELL"
 
-        order = await bingx.place_order(symbol, side, p_side, qty)
+        order = await gateway.place_order(symbol, side, p_side, qty)
         executed = False
         order_id = ""
 
@@ -222,9 +222,9 @@ class TradingEngine:
     async def _update_sl(self, symbol: str, state: AssetState,
                           sl_price: float, qty: float) -> None:
         """Cancel old SL orders and place new one."""
-        await bingx.cancel_all_orders(symbol)
+        await gateway.cancel_all_orders(symbol)
         p_side = "LONG" if state.direction == "LONG" else "SHORT"
-        await bingx.set_sl(symbol, p_side, sl_price, qty)
+        await gateway.set_sl(symbol, p_side, sl_price, qty)
 
     async def update_trailing_sl(self, symbol: str, cfg: AssetConfig) -> None:
         """
@@ -237,7 +237,7 @@ class TradingEngine:
         if state.layers == 0 or not state.direction:
             return
 
-        current = await bingx.fetch_ticker(symbol)
+        current = await gateway.fetch_ticker(symbol)
         if current <= 0:
             return
 
@@ -285,7 +285,7 @@ class TradingEngine:
             new_sl = state.peak_price * (1 + dist_pct)
 
         # Get current positions and total qty
-        positions = await bingx.get_positions(symbol)
+        positions = await gateway.get_positions(symbol)
         total_qty = sum(abs(float(p.get("positionAmt", 0))) for p in positions)
 
         if total_qty > 0:

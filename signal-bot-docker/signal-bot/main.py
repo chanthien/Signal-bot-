@@ -128,7 +128,7 @@ async def health():
             "avg_entry"   : round(s.avg_entry, 4),
             "trail_active": s.trail_active,
         }
-    balance = await bingx.get_balance()
+    balance = await gateway.get_balance()
     return JSONResponse({
         "status" : "ok",
         "balance": balance,
@@ -142,7 +142,7 @@ async def asset_status(symbol: str):
     if symbol not in engine.strategies:
         return JSONResponse({"error": "unknown symbol"}, status_code=404)
     s = engine.strategies[symbol].state
-    current = await bingx.fetch_ticker(symbol)
+    current = await gateway.fetch_ticker(symbol)
     pnl = engine._estimate_pnl_pct(s, current) if current > 0 else 0.0
     return JSONResponse({
         "symbol"      : symbol,
@@ -165,12 +165,12 @@ async def close_symbol(symbol: str):
 
     strategy = engine.strategies[symbol]
     state    = strategy.state
-    current  = await bingx.fetch_ticker(symbol)
+    current  = await gateway.fetch_ticker(symbol)
     pnl      = engine._estimate_pnl_pct(state, current)
     close_direction = state.direction or "ALL"
 
-    ok = await bingx.close_all_positions(symbol)
-    await bingx.cancel_all_orders(symbol)
+    ok = await gateway.close_all_positions(symbol)
+    await gateway.cancel_all_orders(symbol)
     state.reset()
 
     await notifier.send_close(

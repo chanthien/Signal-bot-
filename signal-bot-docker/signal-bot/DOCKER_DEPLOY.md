@@ -236,7 +236,7 @@ curl http://localhost:8000/health
 #   "status": "ok",
 #   "balance": 1250.50,
 #   "assets": {
-#     "GOLD-USDT": {"direction": "", "layers": 0, ...},
+#     "XAUT-USDT": {"direction": "", "layers": 0, ...},
 #     "BTC-USDT":  {"direction": "LONG", "layers": 2, ...},
 #     "ETH-USDT":  {"direction": "", "layers": 0, ...}
 #   }
