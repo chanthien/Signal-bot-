@@ -4,7 +4,7 @@ services:
     # image: ghcr.io/chanthien/signal-bot:latest
     container_name: signal-bot
     restart: unless-stopped
-    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    command: [ "python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1" ]
 
     ports:
       - "8000:8000"
@@ -17,23 +17,27 @@ services:
       - signal-bot-executor
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/live" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
 
   signal-bot-executor:
-    image: ${IMAGE_NAME:-ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest}
+    build: .
+    # image: ghcr.io/chanthien/signal-bot:latest
     container_name: signal-bot-executor
     restart: unless-stopped
-    command: ["python", "-m", "uvicorn", "executor_api:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "1"]
+    command: [ "python", "-m", "uvicorn", "executor_api:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "1" ]
     env_file:
       - .env
     volumes:
       - ./logs:/app/logs
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8010/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
