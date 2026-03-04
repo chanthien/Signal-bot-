@@ -61,6 +61,9 @@ class BingXClient:
 
         if isinstance(candles[0], dict):
             df = pd.DataFrame(candles)
+            if "time" in df.columns and "open_time" not in df.columns:
+                df["time"] = pd.to_numeric(df["time"])
+                df["open_time"] = df["time"]
         else:
             df = pd.DataFrame(candles, columns=[
                 "open_time", "open", "high", "low", "close", "volume", "close_time"

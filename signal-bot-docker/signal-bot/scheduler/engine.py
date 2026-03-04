@@ -11,7 +11,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED
+from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED, MEME_ASSETS
 from execution.gateway import gateway
 from notifier.telegram import notifier
 from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState
@@ -41,14 +41,14 @@ class TradingEngine:
         log.info("engine.started", assets=list(ASSETS.keys()), execution_enabled=self.execution_enabled)
         await notifier.bot_started(list(ASSETS.keys()))
 
-        # Chạy ngay lần đầu, sau đó đợi H1 close
+        # Chạy ngay lần đầu, sau đó đợi mỗi phút
         await self._run_all()
 
         while self._running:
-            wait = self._seconds_to_next_hour()
+            wait = self._seconds_to_next_minute()
             log.info("engine.waiting", seconds=wait,
-                     next_run=self._next_hour_str())
-            await asyncio.sleep(wait + 2)   # +2s buffer sau H1 close
+                     next_run=self._next_minute_str())
+            await asyncio.sleep(wait + 1)   # +1s buffer
             if self._running:
                 await self._run_all()
 
@@ -115,7 +115,7 @@ class TradingEngine:
         executed     = False
         order_id     = ""
 
-        if not self.execution_enabled:
+        if not self.execution_enabled or symbol in MEME_ASSETS:
             await self._simulate_signal(signal, cfg, strategy)
             return
 
@@ -405,14 +405,16 @@ class TradingEngine:
     # ── Timing helpers ────────────────────────────────────────────────────
 
     @staticmethod
-    def _seconds_to_next_hour() -> int:
+    def _seconds_to_next_minute() -> int:
         now = datetime.now(timezone.utc)
-        return 3600 - (now.minute * 60 + now.second)
+        return 60 - now.second
 
     @staticmethod
-    def _next_hour_str() -> str:
+    def _next_minute_str() -> str:
         now = datetime.now(timezone.utc)
-        return f"{(now.hour + 1) % 24:02d}:00 UTC"
+        next_min = (now.minute + 1) % 60
+        next_hour = now.hour if next_min > 0 else (now.hour + 1) % 24
+        return f"{next_hour:02d}:{next_min:02d} UTC"
 
     # ── Daily summary ─────────────────────────────────────────────────────
 
