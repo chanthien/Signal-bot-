@@ -18,7 +18,7 @@ Bot tự động mỗi H1:
 GitHub (source code + CI/CD)
     ↓ push to main → GitHub Actions build Docker image
     ↓ push image to GitHub Container Registry (ghcr.io)
-VPS Ubuntu (pull image → docker-compose up)
+VPS Ubuntu (build local image → docker-compose up)
     ↓
 BingX Futures API + Telegram Bot API
 ```
@@ -125,11 +125,11 @@ cd /opt/signal-bot
 
 # Tải .env template
 curl -o .env.example https://raw.githubusercontent.com/YOUR_USERNAME/signal-bot/main/.env.example
-cp .env.example .env
+cp --update=none .env.example .env
 nano .env
 ```
 
-Điền đầy đủ vào `.env`:
+Điền đầy đủ vào `.env` (bot sẽ **không khởi động** nếu thiếu TELEGRAM/BINGX credentials):
 ```env
 # ── Telegram ──────────────────────────────────────────────
 TELEGRAM_TOKEN=1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
@@ -143,9 +143,17 @@ BINGX_API_SECRET=your_secret_here
 # ── Server ────────────────────────────────────────────────
 PORT=8000
 
-# ── GitHub Repo (để docker-compose pull đúng image) ───────
-GITHUB_REPO=YOUR_USERNAME/signal-bot
+# ── Optional asset groups ─────────────────────────────────
+ENABLE_MEME_GROUP=false
+
+# ── Service split (signal ↔ executor) ─────────────────────
+EXECUTOR_BASE_URL=
+
+# ── Docker image (tuỳ chọn override) ─────────────────────
+IMAGE_NAME=ghcr.io/your_username/signal-bot/signal-bot:latest
 ```
+
+> Mặc định `docker-compose.yml` luôn build local image `signal-bot:local` (không phụ thuộc IMAGE_NAME, tránh lỗi placeholder).
 
 **Cách lấy các giá trị:**
 
@@ -156,6 +164,8 @@ GITHUB_REPO=YOUR_USERNAME/signal-bot
 | `MY_CHAT_ID` | Nhắn bot bất kỳ gì → `https://api.telegram.org/bot<TOKEN>/getUpdates` → tìm `"chat":{"id":...}` |
 | `BINGX_API_KEY` | BingX → Account → API Management → Create API |
 | `BINGX_API_SECRET` | Lấy cùng lúc với API key (chỉ hiện 1 lần) |
+| `ENABLE_MEME_GROUP` | `true` để bật thêm nhóm coin rác/alt |
+| `EXECUTOR_BASE_URL` | URL service executor để tách deploy BingX riêng |
 
 ### Bước 3: Tải docker-compose.yml
 
@@ -166,10 +176,10 @@ curl -o docker-compose.yml https://raw.githubusercontent.com/YOUR_USERNAME/signa
 Hoặc tạo tay:
 ```bash
 cat > /opt/signal-bot/docker-compose.yml << 'EOF'
-version: "3.9"
 services:
   signal-bot:
-    image: ghcr.io/${GITHUB_REPO}/signal-bot:latest
+    build: .
+    image: signal-bot:local
     container_name: signal-bot
     restart: unless-stopped
     ports:
@@ -179,7 +189,7 @@ services:
     volumes:
       - ./logs:/app/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/live"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -202,12 +212,12 @@ EOF
 echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
 ```
 
-### Bước 5: Pull và start
+### Bước 5: Build và start (1 container signal-only)
 
 ```bash
 cd /opt/signal-bot
-docker compose pull
-docker compose up -d
+# Nếu dùng image từ GHCR
+docker compose up -d --build
 
 # Verify
 docker compose ps
@@ -220,6 +230,8 @@ docker compose logs -f --tail=50
 
 ```bash
 # Health check
+curl http://localhost:8000/live
+# nếu live ok, kiểm tra trạng thái chiến lược:
 curl http://localhost:8000/health
 
 # Response mẫu:
@@ -227,7 +239,7 @@ curl http://localhost:8000/health
 #   "status": "ok",
 #   "balance": 1250.50,
 #   "assets": {
-#     "GOLD-USDT": {"direction": "", "layers": 0, ...},
+#     "XAUT-USDT": {"direction": "", "layers": 0, ...},
 #     "BTC-USDT":  {"direction": "LONG", "layers": 2, ...},
 #     "ETH-USDT":  {"direction": "", "layers": 0, ...}
 #   }
@@ -268,6 +280,8 @@ docker compose up -d          # restart với image mới (zero-downtime nếu d
 
 # Verify
 docker compose ps
+curl http://localhost:8000/live
+# nếu live ok, kiểm tra trạng thái chiến lược:
 curl http://localhost:8000/health
 ```
 
@@ -442,6 +456,8 @@ docker compose pull && docker compose up -d
 docker compose logs -f --tail=100
 
 # Health
+curl http://localhost:8000/live
+# nếu live ok, kiểm tra trạng thái chiến lược:
 curl http://localhost:8000/health
 
 # Force run now
@@ -450,3 +466,30 @@ curl -X POST http://localhost:8000/run-now
 # Close all positions for asset
 curl -X POST http://localhost:8000/close/BTC-USDT
 ```
+
+
+### Debug nhanh lỗi ký lệnh BingX
+
+Nếu log có `Incorrect apiKey` hoặc `Signature verification failed`, kiểm tra theo thứ tự:
+1. API key đúng loại **Futures** và đã bật quyền trade.
+2. Key/secret trong `.env` không có khoảng trắng/newline thừa (copy lại tay nếu cần).
+3. VPS đã `git pull` bản mới rồi restart bot.
+4. Test lại endpoint health và logs:
+```bash
+docker compose logs -f --tail=100
+# hoặc
+journalctl -u signal-bot -f
+```
+
+
+
+
+## 13. MỞ RỘNG SAU NÀY: EXECUTOR RIÊNG
+
+Hiện tại bản mặc định là **1 container signal-only** để luôn ổn định.
+
+Khi cần tự động vào lệnh, bạn có thể:
+1. Bật `EXECUTION_ENABLED=true`
+2. Hoặc chạy executor riêng rồi set `EXECUTOR_BASE_URL=<url executor>`
+
+Cách này giúp sửa phần giao dịch độc lập mà không làm chết service signal.

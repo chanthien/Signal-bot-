@@ -11,8 +11,8 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT
-from exchange.bingx import bingx, BingXClient
+from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED
+from execution.gateway import gateway
 from notifier.telegram import notifier
 from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState
 from utils.logger import log
@@ -32,12 +32,13 @@ class TradingEngine:
             for symbol in ASSETS
         }
         self._running = False
+        self.execution_enabled = EXECUTION_ENABLED
 
     # ── Main loop ─────────────────────────────────────────────────────────
 
     async def start(self) -> None:
         self._running = True
-        log.info("engine.started", assets=list(ASSETS.keys()))
+        log.info("engine.started", assets=list(ASSETS.keys()), execution_enabled=self.execution_enabled)
         await notifier.bot_started(list(ASSETS.keys()))
 
         # Chạy ngay lần đầu, sau đó đợi H1 close
@@ -53,6 +54,7 @@ class TradingEngine:
 
     async def stop(self) -> None:
         self._running = False
+        self.execution_enabled = EXECUTION_ENABLED
         log.info("engine.stopped")
 
     # ── Per-bar execution ─────────────────────────────────────────────────
@@ -68,7 +70,7 @@ class TradingEngine:
     async def _run_asset(self, symbol: str, cfg: AssetConfig) -> None:
         try:
             # Fetch OHLCV
-            df = await bingx.fetch_ohlcv(symbol, CANDLE_INTERVAL, CANDLE_LIMIT)
+            df = await gateway.fetch_ohlcv(symbol, CANDLE_INTERVAL, CANDLE_LIMIT)
             if df.empty:
                 log.warning("engine.empty_ohlcv", symbol=symbol)
                 return
@@ -113,15 +115,19 @@ class TradingEngine:
         executed     = False
         order_id     = ""
 
+        if not self.execution_enabled:
+            await self._simulate_signal(signal, cfg, strategy)
+            return
+
         # Set leverage once per session (if not already set)
         if state.layers == 0:
-            await bingx.set_leverage(symbol, cfg.leverage)
+            await gateway.set_leverage(symbol, cfg.leverage)
 
         # ── FLAT / REVERSAL: close all ────────────────────────────────
         if signal.action == "FLAT":
             if state.layers > 0:
-                ok = await bingx.close_all_positions(symbol)
-                await bingx.cancel_all_orders(symbol)
+                ok = await gateway.close_all_positions(symbol)
+                await gateway.cancel_all_orders(symbol)
                 pnl_pct = self._estimate_pnl_pct(state, signal.price)
                 if ok:
                     executed = True
@@ -148,7 +154,7 @@ class TradingEngine:
             qty = self._calc_qty(cfg, signal.price, layer=signal.layer)
             p_side = "LONG" if signal.direction == "LONG" else "SHORT"
             side   = "BUY"  if signal.direction == "LONG" else "SELL"
-            order  = await bingx.place_order(symbol, side, p_side, qty)
+            order  = await gateway.place_order(symbol, side, p_side, qty)
             if order:
                 executed = True
                 order_id = str(order.get("orderId", ""))
@@ -170,7 +176,7 @@ class TradingEngine:
                 qty    = state.sizes[-1]
                 p_side = "LONG" if signal.direction == "LONG" else "SHORT"
                 side   = "SELL" if signal.direction == "LONG" else "BUY"
-                order  = await bingx.place_order(
+                order  = await gateway.place_order(
                     symbol, side, p_side, qty, reduce_only=True
                 )
                 if order:
@@ -186,6 +192,69 @@ class TradingEngine:
             await notifier.send_weak_trend(signal, display_name)
             return
 
+    async def _simulate_signal(
+        self,
+        signal: Signal,
+        cfg: AssetConfig,
+        strategy: GridPyramidStrategy,
+    ) -> None:
+        """Signal-only mode: update internal state and send notifications without placing orders."""
+        state = strategy.state
+        display_name = cfg.display_name
+
+        if signal.action == "FLAT":
+            pnl_pct = self._estimate_pnl_pct(state, signal.price)
+            was_open = state.layers > 0
+            old_direction = state.direction or signal.direction
+            if was_open:
+                self._record_trade(signal.symbol, pnl_pct)
+            state.reset()
+            await notifier.send_close(display_name, old_direction, "Trend End" if signal.direction == "" else "Reversal", pnl_pct if was_open else 0.0, False)
+            if signal.direction in ("LONG", "SHORT"):
+                state.direction = signal.direction
+                state.layers = 1
+                state.entry_prices = [signal.price]
+                state.sizes = [self._calc_qty(cfg, signal.price, layer=0)]
+                state.peak_price = signal.price
+                state.trail_active = False
+                await notifier.send_signal(signal, display_name, False, "")
+            return
+
+        if signal.action in ("LONG", "SHORT"):
+            state.direction = signal.direction
+            state.layers = 1
+            state.entry_prices = [signal.price]
+            state.sizes = [self._calc_qty(cfg, signal.price, layer=0)]
+            state.peak_price = signal.price
+            state.trail_active = False
+            await notifier.send_signal(signal, display_name, False, "")
+            return
+
+        if signal.action == "ADD":
+            qty = self._calc_qty(cfg, signal.price, layer=signal.layer)
+            state.layers += 1
+            state.entry_prices.append(signal.price)
+            state.sizes.append(qty)
+            state.trail_active = False
+            await notifier.send_add_layer(signal, display_name, False)
+            return
+
+        if signal.action == "REDUCE":
+            to_close = min(2, state.layers - 1)
+            for _ in range(to_close):
+                if len(state.sizes) <= 1:
+                    break
+                state.layers -= 1
+                state.entry_prices.pop()
+                state.sizes.pop()
+            await notifier.send_reduce(signal, display_name, False)
+            return
+
+        if signal.action == "WEAK_TREND":
+            await notifier.send_weak_trend(signal, display_name)
+            return
+
+
     async def _open_core(
         self,
         signal:   Signal,
@@ -198,7 +267,7 @@ class TradingEngine:
         p_side   = "LONG" if signal.direction == "LONG" else "SHORT"
         side     = "BUY"  if signal.direction == "LONG" else "SELL"
 
-        order = await bingx.place_order(symbol, side, p_side, qty)
+        order = await gateway.place_order(symbol, side, p_side, qty)
         executed = False
         order_id = ""
 
@@ -222,9 +291,9 @@ class TradingEngine:
     async def _update_sl(self, symbol: str, state: AssetState,
                           sl_price: float, qty: float) -> None:
         """Cancel old SL orders and place new one."""
-        await bingx.cancel_all_orders(symbol)
+        await gateway.cancel_all_orders(symbol)
         p_side = "LONG" if state.direction == "LONG" else "SHORT"
-        await bingx.set_sl(symbol, p_side, sl_price, qty)
+        await gateway.set_sl(symbol, p_side, sl_price, qty)
 
     async def update_trailing_sl(self, symbol: str, cfg: AssetConfig) -> None:
         """
@@ -237,7 +306,7 @@ class TradingEngine:
         if state.layers == 0 or not state.direction:
             return
 
-        current = await bingx.fetch_ticker(symbol)
+        current = await gateway.fetch_ticker(symbol)
         if current <= 0:
             return
 
@@ -285,7 +354,7 @@ class TradingEngine:
             new_sl = state.peak_price * (1 + dist_pct)
 
         # Get current positions and total qty
-        positions = await bingx.get_positions(symbol)
+        positions = await gateway.get_positions(symbol)
         total_qty = sum(abs(float(p.get("positionAmt", 0))) for p in positions)
 
         if total_qty > 0:

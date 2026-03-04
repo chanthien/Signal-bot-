@@ -6,23 +6,29 @@ Tất cả credentials và parameters ở đây.
 
 import os
 from dotenv import load_dotenv
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 load_dotenv()
 
+
+def _env(name: str, default: str = "") -> str:
+    """Read env var and trim spaces/newlines to avoid hidden signature issues."""
+    return os.getenv(name, default).strip()
+
+
 # ── Telegram ──────────────────────────────────────────────
-TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN", "")
-CHANNEL_ID       = os.getenv("CHANNEL_ID", "")       # channel khách xem
-MY_CHAT_ID       = os.getenv("MY_CHAT_ID", "")        # private chat mày review
+TELEGRAM_TOKEN   = _env("TELEGRAM_TOKEN")
+CHANNEL_ID       = _env("CHANNEL_ID")       # channel khách xem
+MY_CHAT_ID       = _env("MY_CHAT_ID")       # private chat mày review
 
 # ── BingX ─────────────────────────────────────────────────
-BINGX_API_KEY    = os.getenv("BINGX_API_KEY", "")
-BINGX_API_SECRET = os.getenv("BINGX_API_SECRET", "")
+BINGX_API_KEY    = _env("BINGX_API_KEY")
+BINGX_API_SECRET = _env("BINGX_API_SECRET")
 BINGX_BASE_URL   = "https://open-api.bingx.com"
 
 # ── Webhook server ─────────────────────────────────────────
-WEBHOOK_SECRET   = os.getenv("WEBHOOK_SECRET", "changeme")
-PORT             = int(os.getenv("PORT", "8000"))
+WEBHOOK_SECRET   = _env("WEBHOOK_SECRET", "changeme")
+PORT             = int(_env("PORT", "8000"))
 
 # ── Strategy module (swap khi đổi algo) ───────────────────
 STRATEGY_MODULE  = "strategy.grid_pyramid"
@@ -30,6 +36,9 @@ STRATEGY_MODULE  = "strategy.grid_pyramid"
 # ── Global H1 defaults (override per-asset trong AssetConfig) ─
 CANDLE_INTERVAL  = "1h"
 CANDLE_LIMIT     = 100    # số nến fetch mỗi lần
+ENABLE_MEME_GROUP = _env("ENABLE_MEME_GROUP", "false").lower() in {"1", "true", "yes", "on"}
+EXECUTOR_BASE_URL = _env("EXECUTOR_BASE_URL", "")
+EXECUTION_ENABLED = _env("EXECUTION_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 
 @dataclass
@@ -69,20 +78,15 @@ class AssetConfig:
     win_rate_base:   float = 0.55   # H1 baseline cao hơn M15
 
 
-# ── Asset configs ─────────────────────────────────────────
+# ── Core asset configs ─────────────────────────────────────
 
-ASSETS: dict[str, AssetConfig] = {
-    "GOLD-USDT": AssetConfig(
-        symbol        = "GOLD-USDT",
-        display_name  = "XAU/USDT (Vàng)",
+CORE_ASSETS: dict[str, AssetConfig] = {
+    "XAUT-USDT": AssetConfig(
+        symbol        = "XAUT-USDT",
+        display_name  = "XAUT/USDT (Vàng)",
         leverage      = 5,
         usdt_per_trade= 10.0,
         pip_value     = 0.1,
-        grid_pct      = 0.8,
-        hard_sl_pct   = 1.2,
-        trail_act_pct = 0.8,
-        trail_dist_pct= 0.4,
-        win_rate_base = 0.55,
     ),
     "BTC-USDT": AssetConfig(
         symbol        = "BTC-USDT",
@@ -90,11 +94,6 @@ ASSETS: dict[str, AssetConfig] = {
         leverage      = 5,
         usdt_per_trade= 10.0,
         pip_value     = 1.0,
-        grid_pct      = 0.8,
-        hard_sl_pct   = 1.2,
-        trail_act_pct = 0.8,
-        trail_dist_pct= 0.4,
-        win_rate_base = 0.55,
     ),
     "ETH-USDT": AssetConfig(
         symbol        = "ETH-USDT",
@@ -102,10 +101,41 @@ ASSETS: dict[str, AssetConfig] = {
         leverage      = 5,
         usdt_per_trade= 10.0,
         pip_value     = 0.1,
-        grid_pct      = 0.8,
-        hard_sl_pct   = 1.2,
-        trail_act_pct = 0.8,
-        trail_dist_pct= 0.4,
-        win_rate_base = 0.55,
     ),
 }
+
+
+# ── Meme/alt group (bật qua ENABLE_MEME_GROUP=true) ─────────
+
+MEME_ASSETS: dict[str, AssetConfig] = {
+    "ARC-USDT": AssetConfig(symbol="ARC-USDT", display_name="ARC/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "MYX-USDT": AssetConfig(symbol="MYX-USDT", display_name="MYX/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "POWER-USDT": AssetConfig(symbol="POWER-USDT", display_name="POWER/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "PHA-USDT": AssetConfig(symbol="PHA-USDT", display_name="PHA/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "B-USDT": AssetConfig(symbol="B-USDT", display_name="B/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "BABY-USDT": AssetConfig(symbol="BABY-USDT", display_name="BABY/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "PIPPIN-USDT": AssetConfig(symbol="PIPPIN-USDT", display_name="PIPPIN/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "ADA-USDT": AssetConfig(symbol="ADA-USDT", display_name="ADA/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "MAGIC-USDT": AssetConfig(symbol="MAGIC-USDT", display_name="MAGIC/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "RIVER-USDT": AssetConfig(symbol="RIVER-USDT", display_name="RIVER/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "TAU-USDT": AssetConfig(symbol="TAU-USDT", display_name="TAU/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "DAM-USDT": AssetConfig(symbol="DAM-USDT", display_name="DAM/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "EUL-USDT": AssetConfig(symbol="EUL-USDT", display_name="EUL/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+}
+
+ASSETS: dict[str, AssetConfig] = {**CORE_ASSETS, **(MEME_ASSETS if ENABLE_MEME_GROUP else {})}
+
+
+def validate_runtime_settings() -> list[str]:
+    """Return missing required settings for runtime."""
+    required = {
+        "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
+        "CHANNEL_ID": CHANNEL_ID,
+        "MY_CHAT_ID": MY_CHAT_ID,
+    }
+    if EXECUTION_ENABLED:
+        required.update({
+            "BINGX_API_KEY": BINGX_API_KEY,
+            "BINGX_API_SECRET": BINGX_API_SECRET,
+        })
+    return [name for name, value in required.items() if not value]
