@@ -18,7 +18,6 @@ class TestValidateRuntimeSettings(unittest.TestCase):
             settings.MY_CHAT_ID = ""
             settings.BINGX_API_KEY = ""
             settings.BINGX_API_SECRET = ""
-            settings.EXECUTION_ENABLED = False
 
             missing = settings.validate_runtime_settings()
             self.assertEqual(
@@ -27,6 +26,8 @@ class TestValidateRuntimeSettings(unittest.TestCase):
                     "TELEGRAM_TOKEN",
                     "CHANNEL_ID",
                     "MY_CHAT_ID",
+                    "BINGX_API_KEY",
+                    "BINGX_API_SECRET",
                 ],
             )
         finally:
@@ -59,34 +60,6 @@ class TestValidateRuntimeSettings(unittest.TestCase):
             settings.MY_CHAT_ID = original["MY_CHAT_ID"]
             settings.BINGX_API_KEY = original["BINGX_API_KEY"]
             settings.BINGX_API_SECRET = original["BINGX_API_SECRET"]
-
-
-    def test_validate_runtime_settings_requires_bingx_when_execution_enabled(self):
-        original = {
-            "TELEGRAM_TOKEN": settings.TELEGRAM_TOKEN,
-            "CHANNEL_ID": settings.CHANNEL_ID,
-            "MY_CHAT_ID": settings.MY_CHAT_ID,
-            "BINGX_API_KEY": settings.BINGX_API_KEY,
-            "BINGX_API_SECRET": settings.BINGX_API_SECRET,
-            "EXECUTION_ENABLED": settings.EXECUTION_ENABLED,
-        }
-        try:
-            settings.TELEGRAM_TOKEN = "token"
-            settings.CHANNEL_ID = "-100123"
-            settings.MY_CHAT_ID = "123"
-            settings.BINGX_API_KEY = ""
-            settings.BINGX_API_SECRET = ""
-            settings.EXECUTION_ENABLED = True
-
-            missing = settings.validate_runtime_settings()
-            self.assertEqual(missing, ["BINGX_API_KEY", "BINGX_API_SECRET"])
-        finally:
-            settings.TELEGRAM_TOKEN = original["TELEGRAM_TOKEN"]
-            settings.CHANNEL_ID = original["CHANNEL_ID"]
-            settings.MY_CHAT_ID = original["MY_CHAT_ID"]
-            settings.BINGX_API_KEY = original["BINGX_API_KEY"]
-            settings.BINGX_API_SECRET = original["BINGX_API_SECRET"]
-            settings.EXECUTION_ENABLED = original["EXECUTION_ENABLED"]
 
 
 if __name__ == "__main__":

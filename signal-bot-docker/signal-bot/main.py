@@ -14,8 +14,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from config.settings import ASSETS, PORT, EXECUTION_ENABLED, validate_runtime_settings
-from execution.gateway import gateway
+from config.settings import ASSETS, PORT, validate_runtime_settings
+from exchange.bingx import bingx
 from notifier.telegram import notifier
 from scheduler.engine import engine
 from utils.logger import log
@@ -135,22 +135,12 @@ async def health():
             "avg_entry"   : round(s.avg_entry, 4),
             "trail_active": s.trail_active,
         }
-
-    try:
-        balance = await gateway.get_balance()
-        return JSONResponse({
-            "status" : "ok",
-            "balance": balance,
-            "assets" : status,
-        })
-    except Exception as e:
-        log.error("health.balance_error", error=str(e))
-        return JSONResponse({
-            "status" : "degraded",
-            "balance": 0.0,
-            "assets" : status,
-            "error"  : str(e),
-        }, status_code=200)
+    balance = await gateway.get_balance()
+    return JSONResponse({
+        "status" : "ok",
+        "balance": balance,
+        "assets" : status,
+    })
 
 
 @app.get("/status/{symbol}")
@@ -185,16 +175,6 @@ async def close_symbol(symbol: str):
     current  = await gateway.fetch_ticker(symbol)
     pnl      = engine._estimate_pnl_pct(state, current)
     close_direction = state.direction or "ALL"
-
-    if not EXECUTION_ENABLED:
-        state.reset()
-        await notifier.send_close(
-            ASSETS[symbol].display_name,
-            close_direction,
-            "Manual Close (Signal-Only)",
-            pnl, False
-        )
-        return JSONResponse({"closed": False, "estimated_pnl": round(pnl, 4), "mode": "signal_only"})
 
     ok = await gateway.close_all_positions(symbol)
     await gateway.cancel_all_orders(symbol)

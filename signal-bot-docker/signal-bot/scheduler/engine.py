@@ -11,7 +11,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED
+from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT
 from execution.gateway import gateway
 from notifier.telegram import notifier
 from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState

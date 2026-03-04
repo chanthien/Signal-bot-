@@ -146,14 +146,11 @@ PORT=8000
 # ── Optional asset groups ─────────────────────────────────
 ENABLE_MEME_GROUP=false
 
-# ── Service split (signal ↔ executor) ─────────────────────
-EXECUTOR_BASE_URL=
-
 # ── Docker image (tuỳ chọn override) ─────────────────────
-IMAGE_NAME=ghcr.io/your_username/signal-bot/signal-bot:latest
+IMAGE_NAME=ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest
 ```
 
-> Mặc định `docker-compose.yml` luôn build local image `signal-bot:local` (không phụ thuộc IMAGE_NAME, tránh lỗi placeholder).
+> Nếu không set `IMAGE_NAME`, docker-compose sẽ dùng image mặc định ở trên.
 
 **Cách lấy các giá trị:**
 
@@ -165,7 +162,6 @@ IMAGE_NAME=ghcr.io/your_username/signal-bot/signal-bot:latest
 | `BINGX_API_KEY` | BingX → Account → API Management → Create API |
 | `BINGX_API_SECRET` | Lấy cùng lúc với API key (chỉ hiện 1 lần) |
 | `ENABLE_MEME_GROUP` | `true` để bật thêm nhóm coin rác/alt |
-| `EXECUTOR_BASE_URL` | URL service executor để tách deploy BingX riêng |
 
 ### Bước 3: Tải docker-compose.yml
 
@@ -178,8 +174,7 @@ Hoặc tạo tay:
 cat > /opt/signal-bot/docker-compose.yml << 'EOF'
 services:
   signal-bot:
-    build: .
-    image: signal-bot:local
+    image: ${IMAGE_NAME:-ghcr.io/YOUR_USERNAME/signal-bot/signal-bot:latest}
     container_name: signal-bot
     restart: unless-stopped
     ports:
@@ -217,7 +212,11 @@ echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password
 ```bash
 cd /opt/signal-bot
 # Nếu dùng image từ GHCR
-docker compose up -d --build
+docker compose pull
+docker compose up -d
+
+# Nếu muốn build local từ source (không cần GHCR)
+# docker compose up -d --build
 
 # Verify
 docker compose ps
@@ -480,16 +479,3 @@ docker compose logs -f --tail=100
 # hoặc
 journalctl -u signal-bot -f
 ```
-
-
-
-
-## 13. MỞ RỘNG SAU NÀY: EXECUTOR RIÊNG
-
-Hiện tại bản mặc định là **1 container signal-only** để luôn ổn định.
-
-Khi cần tự động vào lệnh, bạn có thể:
-1. Bật `EXECUTION_ENABLED=true`
-2. Hoặc chạy executor riêng rồi set `EXECUTOR_BASE_URL=<url executor>`
-
-Cách này giúp sửa phần giao dịch độc lập mà không làm chết service signal.

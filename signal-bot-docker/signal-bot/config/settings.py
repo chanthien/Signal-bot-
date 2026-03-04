@@ -37,8 +37,6 @@ STRATEGY_MODULE  = "strategy.grid_pyramid"
 CANDLE_INTERVAL  = "1h"
 CANDLE_LIMIT     = 100    # số nến fetch mỗi lần
 ENABLE_MEME_GROUP = _env("ENABLE_MEME_GROUP", "false").lower() in {"1", "true", "yes", "on"}
-EXECUTOR_BASE_URL = _env("EXECUTOR_BASE_URL", "")
-EXECUTION_ENABLED = _env("EXECUTION_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 
 @dataclass
@@ -75,7 +73,7 @@ class AssetConfig:
     tp2_atr_mult:    float = 4.0
 
     # Win rate baseline cho confidence score
-    win_rate_base:   float = 0.55   # H1 baseline cao hơn M15
+    win_rate_base:   float = 0.60   # H1 baseline cao hơn M15
 
 
 # ── Core asset configs ─────────────────────────────────────
@@ -83,7 +81,7 @@ class AssetConfig:
 CORE_ASSETS: dict[str, AssetConfig] = {
     "XAUT-USDT": AssetConfig(
         symbol        = "XAUT-USDT",
-        display_name  = "XAUT/USDT (Vàng)",
+        display_name  = "XAU/USDT (Vàng)",
         leverage      = 5,
         usdt_per_trade= 10.0,
         pip_value     = 0.1,
@@ -127,15 +125,12 @@ ASSETS: dict[str, AssetConfig] = {**CORE_ASSETS, **(MEME_ASSETS if ENABLE_MEME_G
 
 
 def validate_runtime_settings() -> list[str]:
-    """Return missing required settings for runtime."""
+    """Return missing required settings for live trading runtime."""
     required = {
         "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
         "CHANNEL_ID": CHANNEL_ID,
         "MY_CHAT_ID": MY_CHAT_ID,
+        "BINGX_API_KEY": BINGX_API_KEY,
+        "BINGX_API_SECRET": BINGX_API_SECRET,
     }
-    if EXECUTION_ENABLED:
-        required.update({
-            "BINGX_API_KEY": BINGX_API_KEY,
-            "BINGX_API_SECRET": BINGX_API_SECRET,
-        })
     return [name for name, value in required.items() if not value]

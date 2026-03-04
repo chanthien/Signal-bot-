@@ -6,17 +6,14 @@ from typing import Optional
 
 import httpx
 
-from config import settings
+from config.settings import EXECUTOR_BASE_URL
 from exchange.bingx import bingx
 from utils.logger import log
 
 
 class TradeGateway:
-    def __init__(self, executor_base_url: str | None = None):
-        # Backward-compatible: if older settings.py lacks EXECUTOR_BASE_URL, fallback to empty string
-        if executor_base_url is None:
-            executor_base_url = getattr(settings, "EXECUTOR_BASE_URL", "")
-        self.executor_base_url = str(executor_base_url).rstrip("/")
+    def __init__(self, executor_base_url: str = EXECUTOR_BASE_URL):
+        self.executor_base_url = executor_base_url.rstrip("/")
 
     @property
     def remote_enabled(self) -> bool:
