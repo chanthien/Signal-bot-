@@ -35,3 +35,7 @@
 2026-03-04 15:18:50 | INFO     | [2m08:18:50[0m [[32m[1minfo     [0m] [1mbot.stopped                   [0m
 2026-03-04 15:26:36 | ERROR    | [2m08:26:36[0m [[31m[1merror    [0m] [1mhealth.balance_error          [0m [36merror[0m=[35mboom[0m
 2026-03-04 15:26:36 | INFO     | [2m08:26:36[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 16:00:03 | WARNING  | [2m09:00:03[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mBTC-USDT[0m
+2026-03-04 16:00:03 | WARNING  | [2m09:00:03[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mXAUT-USDT[0m
+2026-03-04 16:00:03 | WARNING  | [2m09:00:03[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mETH-USDT[0m
+2026-03-04 16:00:03 | INFO     | [2m09:00:03[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m10:00 UTC[0m [36mseconds[0m=[35m3597[0m
