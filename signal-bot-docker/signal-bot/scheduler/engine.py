@@ -32,12 +32,13 @@ class TradingEngine:
             for symbol in ASSETS
         }
         self._running = False
+        self.execution_enabled = EXECUTION_ENABLED
 
     # ── Main loop ─────────────────────────────────────────────────────────
 
     async def start(self) -> None:
         self._running = True
-        log.info("engine.started", assets=list(ASSETS.keys()))
+        log.info("engine.started", assets=list(ASSETS.keys()), execution_enabled=self.execution_enabled)
         await notifier.bot_started(list(ASSETS.keys()))
 
         # Chạy ngay lần đầu, sau đó đợi H1 close
@@ -53,6 +54,7 @@ class TradingEngine:
 
     async def stop(self) -> None:
         self._running = False
+        self.execution_enabled = EXECUTION_ENABLED
         log.info("engine.stopped")
 
     # ── Per-bar execution ─────────────────────────────────────────────────
@@ -112,6 +114,10 @@ class TradingEngine:
         display_name = cfg.display_name
         executed     = False
         order_id     = ""
+
+        if not self.execution_enabled:
+            await self._simulate_signal(signal, cfg, strategy)
+            return
 
         # Set leverage once per session (if not already set)
         if state.layers == 0:
@@ -185,6 +191,69 @@ class TradingEngine:
         if signal.action == "WEAK_TREND":
             await notifier.send_weak_trend(signal, display_name)
             return
+
+    async def _simulate_signal(
+        self,
+        signal: Signal,
+        cfg: AssetConfig,
+        strategy: GridPyramidStrategy,
+    ) -> None:
+        """Signal-only mode: update internal state and send notifications without placing orders."""
+        state = strategy.state
+        display_name = cfg.display_name
+
+        if signal.action == "FLAT":
+            pnl_pct = self._estimate_pnl_pct(state, signal.price)
+            was_open = state.layers > 0
+            old_direction = state.direction or signal.direction
+            if was_open:
+                self._record_trade(signal.symbol, pnl_pct)
+            state.reset()
+            await notifier.send_close(display_name, old_direction, "Trend End" if signal.direction == "" else "Reversal", pnl_pct if was_open else 0.0, False)
+            if signal.direction in ("LONG", "SHORT"):
+                state.direction = signal.direction
+                state.layers = 1
+                state.entry_prices = [signal.price]
+                state.sizes = [self._calc_qty(cfg, signal.price, layer=0)]
+                state.peak_price = signal.price
+                state.trail_active = False
+                await notifier.send_signal(signal, display_name, False, "")
+            return
+
+        if signal.action in ("LONG", "SHORT"):
+            state.direction = signal.direction
+            state.layers = 1
+            state.entry_prices = [signal.price]
+            state.sizes = [self._calc_qty(cfg, signal.price, layer=0)]
+            state.peak_price = signal.price
+            state.trail_active = False
+            await notifier.send_signal(signal, display_name, False, "")
+            return
+
+        if signal.action == "ADD":
+            qty = self._calc_qty(cfg, signal.price, layer=signal.layer)
+            state.layers += 1
+            state.entry_prices.append(signal.price)
+            state.sizes.append(qty)
+            state.trail_active = False
+            await notifier.send_add_layer(signal, display_name, False)
+            return
+
+        if signal.action == "REDUCE":
+            to_close = min(2, state.layers - 1)
+            for _ in range(to_close):
+                if len(state.sizes) <= 1:
+                    break
+                state.layers -= 1
+                state.entry_prices.pop()
+                state.sizes.pop()
+            await notifier.send_reduce(signal, display_name, False)
+            return
+
+        if signal.action == "WEAK_TREND":
+            await notifier.send_weak_trend(signal, display_name)
+            return
+
 
     async def _open_core(
         self,

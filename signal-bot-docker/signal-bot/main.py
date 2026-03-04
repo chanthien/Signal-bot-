@@ -117,6 +117,13 @@ app = FastAPI(
 
 # ── API endpoints ─────────────────────────────────────────────────────────
 
+
+@app.get("/live")
+async def live():
+    """Lightweight liveness probe (no external dependency)."""
+    return JSONResponse({"status": "alive"})
+
+
 @app.get("/health")
 async def health():
     status = {}

@@ -18,7 +18,7 @@ Bot tự động mỗi H1:
 GitHub (source code + CI/CD)
     ↓ push to main → GitHub Actions build Docker image
     ↓ push image to GitHub Container Registry (ghcr.io)
-VPS Ubuntu (pull image → docker-compose up)
+VPS Ubuntu (build local image → docker-compose up)
     ↓
 BingX Futures API + Telegram Bot API
 ```
@@ -184,7 +184,7 @@ services:
     volumes:
       - ./logs:/app/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/live"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -207,7 +207,7 @@ EOF
 echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
 ```
 
-### Bước 5: Pull và start
+### Bước 5: Build và start (1 container signal-only)
 
 ```bash
 cd /opt/signal-bot
@@ -229,6 +229,8 @@ docker compose logs -f --tail=50
 
 ```bash
 # Health check
+curl http://localhost:8000/live
+# nếu live ok, kiểm tra trạng thái chiến lược:
 curl http://localhost:8000/health
 
 # Response mẫu:
@@ -277,6 +279,8 @@ docker compose up -d          # restart với image mới (zero-downtime nếu d
 
 # Verify
 docker compose ps
+curl http://localhost:8000/live
+# nếu live ok, kiểm tra trạng thái chiến lược:
 curl http://localhost:8000/health
 ```
 
@@ -451,6 +455,8 @@ docker compose pull && docker compose up -d
 docker compose logs -f --tail=100
 
 # Health
+curl http://localhost:8000/live
+# nếu live ok, kiểm tra trạng thái chiến lược:
 curl http://localhost:8000/health
 
 # Force run now
