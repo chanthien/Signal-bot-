@@ -1,0 +1,8 @@
+services:
+  signal-bot:
+    image: ${IMAGE_NAME}
+    build: null
+
+  signal-bot-executor:
+    image: ${IMAGE_NAME}
+    build: null
