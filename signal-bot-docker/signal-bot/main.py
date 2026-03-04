@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from config.settings import ASSETS, PORT, validate_runtime_settings
-from exchange.bingx import bingx
+from execution.gateway import gateway
 from notifier.telegram import notifier
 from scheduler.engine import engine
 from utils.logger import log
@@ -135,9 +135,16 @@ async def health():
             "avg_entry"   : round(s.avg_entry, 4),
             "trail_active": s.trail_active,
         }
-    balance = await gateway.get_balance()
+    try:
+        balance = await gateway.get_balance()
+        status_msg = "ok"
+    except Exception as e:
+        log.error("health.balance_error", error=str(e))
+        balance = 0.0
+        status_msg = "degraded"
+
     return JSONResponse({
-        "status" : "ok",
+        "status" : status_msg,
         "balance": balance,
         "assets" : status,
     })

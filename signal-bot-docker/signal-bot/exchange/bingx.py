@@ -149,11 +149,28 @@ class BingXClient:
                 return 0.0
 
             payload = data.get("data", {})
-            balances = payload.get("balance", []) if isinstance(payload, dict) else []
-            for asset in balances:
-                if str(asset.get("asset", "")).upper() == "USDT":
-                    return float(asset.get("availableMargin", 0.0))
+            
+            # Debug the payload structure
+            print(f"DEBUG: get_balance data = {data}")
+            
+            # data structure: {"code": 0, "msg": "", "data": {"balance": {"asset": "USDT", "availableMargin": "123.45", ...}}}
+            # BingX API V2 sometimes returns balance as a dict, not a list
+            
+            if isinstance(payload, dict) and "balance" in payload:
+                balances = payload["balance"]
+                # In swap v2/user/balance, it is usually a dict
+                if isinstance(balances, dict):
+                    if balances.get("asset", "").upper() == "USDT":
+                        return float(balances.get("availableMargin", 0.0))
+                # Or a list of dicts
+                elif isinstance(balances, list):
+                    for asset in balances:
+                        if isinstance(asset, dict) and str(asset.get("asset", "")).upper() == "USDT":
+                            return float(asset.get("availableMargin", 0.0))
+                            
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             log.error("bingx.balance_error", error=str(e))
         return 0.0
 
@@ -186,20 +203,12 @@ class BingXClient:
         params = self._signed_params({
             "symbol": symbol,
             "leverage": leverage,
-            "side": "LONG",
+            "side": "BOTH",
         })
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(url, params=params, headers=self._auth_headers())
                 data = resp.json()
-
-            params2 = self._signed_params({
-                "symbol": symbol,
-                "leverage": leverage,
-                "side": "SHORT",
-            })
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.post(url, params=params2, headers=self._auth_headers())
             return data.get("code") == 0
         except Exception as e:
             log.error("bingx.leverage_error", symbol=symbol, error=str(e))
@@ -222,10 +231,16 @@ class BingXClient:
         side=BUY + positionSide=SHORT  → close short
         """
         url = f"{self.base}/openApi/swap/v2/trade/order"
+        
+        # Determine correct positionSide and side for One-Way Mode
+        # In One-Way mode, positionSide MUST be "BOTH"
+        bingx_position_side = "BOTH"
+        bingx_side = side
+        
         params: dict = {
             "symbol": symbol,
-            "side": side,
-            "positionSide": position_side,
+            "side": bingx_side,
+            "positionSide": bingx_position_side,
             "type": order_type,
             "quantity": quantity,
         }
@@ -260,12 +275,16 @@ class BingXClient:
         positions = await self.get_positions(symbol)
         success = True
         for pos in positions:
-            amt = float(pos["positionAmt"])
-            p_side = pos["positionSide"]
+            amt = float(pos.get("positionAmt", 0))
+            p_side = pos.get("positionSide", "LONG")
             if amt == 0:
                 continue
-            side = "SELL" if p_side == "LONG" else "BUY"
-            result = await self.place_order(symbol, side, p_side, abs(amt), reduce_only=True)
+            
+            # In One-Way mode, positionAmt is positive but positionSide is still LONG/SHORT.
+            # To close a SHORT position, we BUY. To close a LONG position, we SELL.
+            side = "BUY" if p_side == "SHORT" else "SELL"
+            
+            result = await self.place_order(symbol, side, "BOTH", abs(amt), reduce_only=True)
             if not result:
                 success = False
         return success
@@ -277,7 +296,7 @@ class BingXClient:
         params = self._signed_params({
             "symbol": symbol,
             "side": side,
-            "positionSide": position_side,
+            "positionSide": "BOTH",
             "type": "STOP_MARKET",
             "stopPrice": sl_price,
             "quantity": quantity,

@@ -11,7 +11,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT
+from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED
 from execution.gateway import gateway
 from notifier.telegram import notifier
 from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState
@@ -155,14 +155,17 @@ class TradingEngine:
             p_side = "LONG" if signal.direction == "LONG" else "SHORT"
             side   = "BUY"  if signal.direction == "LONG" else "SELL"
             order  = await gateway.place_order(symbol, side, p_side, qty)
+            
+            # State update happens regardless of order execution success
+            state.layers += 1
+            state.entry_prices.append(signal.price)
+            state.sizes.append(qty)
+            state.trail_active = False  # reset trailing on add
+            
             if order:
                 executed = True
                 order_id = str(order.get("orderId", ""))
-                state.layers += 1
-                state.entry_prices.append(signal.price)
-                state.sizes.append(qty)
-                state.trail_active = False  # reset trailing on add
-                # Update SL
+                # Update SL only if order succeeded (or we could always try to update)
                 await self._update_sl(symbol, state, signal.sl_price, qty)
             await notifier.send_add_layer(signal, display_name, executed)
             return
@@ -179,11 +182,14 @@ class TradingEngine:
                 order  = await gateway.place_order(
                     symbol, side, p_side, qty, reduce_only=True
                 )
+                
+                # State update happens regardless of order execution success
+                state.layers -= 1
+                state.entry_prices.pop()
+                state.sizes.pop()
+                
                 if order:
                     executed = True
-                    state.layers -= 1
-                    state.entry_prices.pop()
-                    state.sizes.pop()
             await notifier.send_reduce(signal, display_name, executed)
             return
 
@@ -271,17 +277,18 @@ class TradingEngine:
         executed = False
         order_id = ""
 
+        # Update state regardless of order execution success
+        state.direction    = signal.direction
+        state.layers       = 1
+        state.entry_prices = [signal.price]
+        state.sizes        = [qty]
+        state.peak_price   = signal.price
+        state.trail_active = False
+
         if order:
             executed = True
             order_id = str(order.get("orderId", ""))
-            # Update state
-            state.direction    = signal.direction
-            state.layers       = 1
-            state.entry_prices = [signal.price]
-            state.sizes        = [qty]
-            state.peak_price   = signal.price
-            state.trail_active = False
-            # Place SL
+            # Place SL only if order succeeds
             await self._update_sl(symbol, state, signal.sl_price, qty)
 
         await notifier.send_signal(signal, cfg.display_name, executed, order_id)

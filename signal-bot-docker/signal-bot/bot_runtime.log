@@ -1,0 +1,11 @@
+nohup: ignoring input
+INFO:     Started server process [1181952]
+INFO:     Waiting for application startup.
+2026-03-04 15:18:49 | INFO     | [2m08:18:49[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 15:18:49 | INFO     | [2m08:18:49[0m [[32m[1minfo     [0m] [1mengine.started                [0m [36massets[0m=[35m['XAUT-USDT', 'BTC-USDT', 'ETH-USDT'][0m [36mexecution_enabled[0m=[35mFalse[0m
+INFO:     Application startup complete.
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8000): address already in use
+INFO:     Waiting for application shutdown.
+2026-03-04 15:18:49 | INFO     | [2m08:18:49[0m [[32m[1minfo     [0m] [1mengine.stopped                [0m
+2026-03-04 15:18:50 | INFO     | [2m08:18:50[0m [[32m[1minfo     [0m] [1mbot.stopped                   [0m
+INFO:     Application shutdown complete.

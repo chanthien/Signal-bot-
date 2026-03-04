@@ -1,0 +1,37 @@
+2026-03-04 14:09:45 | INFO     | [2m07:09:45[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 14:10:38 | ERROR    | [2m07:10:38[0m [[31m[1merror    [0m] [1mhealth.balance_error          [0m [36merror[0m=[35mboom[0m
+2026-03-04 14:10:38 | INFO     | [2m07:10:38[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 14:18:19 | ERROR    | [2m07:18:19[0m [[31m[1merror    [0m] [1mbingx.balance_api_error       [0m [36mcode[0m=[35m100413[0m [36mmsg[0m=[35mIncorrect apiKey, please check your valid api key in https://bingx.com/en/account/api[0m
+2026-03-04 14:22:50 | ERROR    | [2m07:22:50[0m [[31m[1merror    [0m] [1mbingx.balance_error           [0m [36merror[0m=[35m'str' object has no attribute 'get'[0m
+2026-03-04 14:30:54 | ERROR    | [2m07:30:54[0m [[31m[1merror    [0m] [1mbingx.order_failed            [0m [36mcode[0m=[35m109400[0m [36mmsg[0m=[35mIn the One-way mode, the 'PositionSide' field can only be set to BOTH.[0m [36msymbol[0m=[35mPIPPIN-USDT[0m
+2026-03-04 14:33:25 | INFO     | [2m07:33:25[0m [[32m[1minfo     [0m] [1mbingx.order_placed            [0m [36morder_id[0m=[35m2029097867919187969[0m [36mposition_side[0m=[35mSHORT[0m [36mqty[0m=[35m18.0[0m [36mside[0m=[35mSELL[0m [36msymbol[0m=[35mPIPPIN-USDT[0m
+2026-03-04 14:33:29 | ERROR    | [2m07:33:29[0m [[31m[1merror    [0m] [1mbingx.order_failed            [0m [36mcode[0m=[35m101290[0m [36mmsg[0m=[35mThe Reduce Only order can only decrease the position and not be used to open a position. Please check your positions and open orders.[0m [36msymbol[0m=[35mPIPPIN-USDT[0m
+2026-03-04 14:34:26 | ERROR    | [2m07:34:26[0m [[31m[1merror    [0m] [1mhealth.balance_error          [0m [36merror[0m=[35mboom[0m
+2026-03-04 14:34:26 | INFO     | [2m07:34:26[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 14:50:20 | ERROR    | [2m07:50:20[0m [[31m[1merror    [0m] [1mbingx.order_failed            [0m [36mcode[0m=[35m101290[0m [36mmsg[0m=[35mThe Reduce Only order can only decrease the position and not be used to open a position. Please check your positions and open orders.[0m [36msymbol[0m=[35mPIPPIN-USDT[0m
+2026-03-04 14:51:07 | INFO     | [2m07:51:07[0m [[32m[1minfo     [0m] [1mbingx.order_placed            [0m [36morder_id[0m=[35m2029102321112408065[0m [36mposition_side[0m=[35mSHORT[0m [36mqty[0m=[35m18.0[0m [36mside[0m=[35mSELL[0m [36msymbol[0m=[35mPIPPIN-USDT[0m
+2026-03-04 14:51:10 | INFO     | [2m07:51:10[0m [[32m[1minfo     [0m] [1mbingx.order_placed            [0m [36morder_id[0m=[35m2029102337235312641[0m [36mposition_side[0m=[35mBOTH[0m [36mqty[0m=[35m36.0[0m [36mside[0m=[35mBUY[0m [36msymbol[0m=[35mPIPPIN-USDT[0m
+2026-03-04 14:54:02 | INFO     | [2m07:54:02[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 14:54:02 | INFO     | [2m07:54:02[0m [[32m[1minfo     [0m] [1mengine.started                [0m [36massets[0m=[35m['XAUT-USDT', 'BTC-USDT', 'ETH-USDT'][0m [36mexecution_enabled[0m=[35mFalse[0m
+2026-03-04 14:54:05 | WARNING  | [2m07:54:05[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mXAUT-USDT[0m
+2026-03-04 14:54:05 | WARNING  | [2m07:54:05[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mBTC-USDT[0m
+2026-03-04 14:54:05 | WARNING  | [2m07:54:05[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mETH-USDT[0m
+2026-03-04 14:54:05 | INFO     | [2m07:54:05[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m08:00 UTC[0m [36mseconds[0m=[35m355[0m
+2026-03-04 15:00:02 | WARNING  | [2m08:00:02[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mBTC-USDT[0m
+2026-03-04 15:00:02 | WARNING  | [2m08:00:02[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mXAUT-USDT[0m
+2026-03-04 15:00:02 | WARNING  | [2m08:00:02[0m [[33m[1mwarning  [0m] [1mengine.empty_ohlcv            [0m [36msymbol[0m=[35mETH-USDT[0m
+2026-03-04 15:00:02 | INFO     | [2m08:00:02[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m09:00 UTC[0m [36mseconds[0m=[35m3598[0m
+2026-03-04 15:09:42 | INFO     | [2m08:09:42[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 15:09:42 | INFO     | [2m08:09:42[0m [[32m[1minfo     [0m] [1mengine.started                [0m [36massets[0m=[35m['XAUT-USDT', 'BTC-USDT', 'ETH-USDT'][0m [36mexecution_enabled[0m=[35mFalse[0m
+2026-03-04 15:09:42 | INFO     | [2m08:09:42[0m [[32m[1minfo     [0m] [1mengine.stopped                [0m
+2026-03-04 15:09:43 | INFO     | [2m08:09:43[0m [[32m[1minfo     [0m] [1mbot.stopped                   [0m
+2026-03-04 15:10:56 | INFO     | [2m08:10:56[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 15:10:56 | INFO     | [2m08:10:56[0m [[32m[1minfo     [0m] [1mengine.started                [0m [36massets[0m=[35m['XAUT-USDT', 'BTC-USDT', 'ETH-USDT'][0m [36mexecution_enabled[0m=[35mFalse[0m
+2026-03-04 15:10:56 | INFO     | [2m08:10:56[0m [[32m[1minfo     [0m] [1mengine.stopped                [0m
+2026-03-04 15:10:57 | INFO     | [2m08:10:57[0m [[32m[1minfo     [0m] [1mbot.stopped                   [0m
+2026-03-04 15:18:49 | INFO     | [2m08:18:49[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m
+2026-03-04 15:18:49 | INFO     | [2m08:18:49[0m [[32m[1minfo     [0m] [1mengine.started                [0m [36massets[0m=[35m['XAUT-USDT', 'BTC-USDT', 'ETH-USDT'][0m [36mexecution_enabled[0m=[35mFalse[0m
+2026-03-04 15:18:49 | INFO     | [2m08:18:49[0m [[32m[1minfo     [0m] [1mengine.stopped                [0m
+2026-03-04 15:18:50 | INFO     | [2m08:18:50[0m [[32m[1minfo     [0m] [1mbot.stopped                   [0m
+2026-03-04 15:26:36 | ERROR    | [2m08:26:36[0m [[31m[1merror    [0m] [1mhealth.balance_error          [0m [36merror[0m=[35mboom[0m
+2026-03-04 15:26:36 | INFO     | [2m08:26:36[0m [[32m[1minfo     [0m] [1mbot.starting                  [0m

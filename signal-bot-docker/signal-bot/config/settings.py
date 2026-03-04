@@ -30,6 +30,10 @@ BINGX_BASE_URL   = "https://open-api.bingx.com"
 WEBHOOK_SECRET   = _env("WEBHOOK_SECRET", "changeme")
 PORT             = int(_env("PORT", "8000"))
 
+# ── Executor ───────────────────────────────────────────────
+EXECUTOR_BASE_URL= _env("EXECUTOR_BASE_URL", "")
+EXECUTION_ENABLED= _env("EXECUTION_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+
 # ── Strategy module (swap khi đổi algo) ───────────────────
 STRATEGY_MODULE  = "strategy.grid_pyramid"
 
@@ -82,22 +86,22 @@ CORE_ASSETS: dict[str, AssetConfig] = {
     "XAUT-USDT": AssetConfig(
         symbol        = "XAUT-USDT",
         display_name  = "XAU/USDT (Vàng)",
-        leverage      = 5,
-        usdt_per_trade= 10.0,
+        leverage      = 40,
+        quantity      = 0.05,
         pip_value     = 0.1,
     ),
     "BTC-USDT": AssetConfig(
         symbol        = "BTC-USDT",
         display_name  = "BTC/USDT",
-        leverage      = 5,
-        usdt_per_trade= 10.0,
+        leverage      = 40,
+        quantity      = 0.01,
         pip_value     = 1.0,
     ),
     "ETH-USDT": AssetConfig(
         symbol        = "ETH-USDT",
         display_name  = "ETH/USDT",
-        leverage      = 5,
-        usdt_per_trade= 10.0,
+        leverage      = 40,
+        quantity      = 0.1,
         pip_value     = 0.1,
     ),
 }
