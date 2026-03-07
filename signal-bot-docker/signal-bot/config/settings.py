@@ -52,6 +52,9 @@ class AssetConfig:
     quantity:        float = 0.0    # contract size (0 = tự tính từ usdt_per_trade)
     usdt_per_trade:  float = 10.0   # USD mỗi lệnh core (nếu quantity=0)
     pip_value:       float = 0.1    # giá trị 1 pip (price point)
+    strategy_module: str   = "strategy.grid_pyramid" # Add strategy override module per asset
+    account_equity:  float = 1000.0 # base account equity for risk
+    risk_pct:        float = 0.01   # base max risk per trade
 
     # H1 Strategy params
     pivot_len:       int   = 4
@@ -87,22 +90,25 @@ CORE_ASSETS: dict[str, AssetConfig] = {
         symbol        = "XAUT-USDT",
         display_name  = "XAU/USDT (Vàng)",
         leverage      = 40,
-        quantity      = 0.05,
+        quantity      = 0.0125, # 0.05 / 4
         pip_value     = 0.1,
+        strategy_module = "strategy.andz_v71",
     ),
     "BTC-USDT": AssetConfig(
         symbol        = "BTC-USDT",
         display_name  = "BTC/USDT",
         leverage      = 40,
-        quantity      = 0.01,
+        quantity      = 0.0025, # 0.01 / 4
         pip_value     = 1.0,
+        strategy_module = "strategy.grid_pyramid_v9_optimized",
     ),
     "ETH-USDT": AssetConfig(
         symbol        = "ETH-USDT",
         display_name  = "ETH/USDT",
         leverage      = 40,
-        quantity      = 0.1,
+        quantity      = 0.025, # 0.1 / 4
         pip_value     = 0.1,
+        strategy_module = "strategy.andz_v80_strategy",
     ),
 }
 

@@ -18,14 +18,39 @@ from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState
 from utils.logger import log
 
 
+import importlib
+
 class TradingEngine:
 
     def __init__(self):
         # Khởi tạo strategy instance cho từng asset
-        self.strategies: dict[str, GridPyramidStrategy] = {
-            symbol: GridPyramidStrategy(cfg)
-            for symbol, cfg in ASSETS.items()
-        }
+        self.strategies: dict[str, any] = {}
+        for symbol, cfg in ASSETS.items():
+            try:
+                module_path = getattr(cfg, "strategy_module", "strategy.grid_pyramid")
+                module = importlib.import_module(module_path)
+                
+                # Guess class name (e.g., "GridPyramidV9Optimized" from "grid_pyramid_v9_optimized")
+                # Alternatively we can define a standard class name or try both:
+                class_names = [
+                    "AndzV80Strategy", 
+                    "GridPyramidStrategy", 
+                    "AndzV71Strategy"
+                ]
+                
+                strategy_class = None
+                for name in class_names:
+                    if hasattr(module, name):
+                        strategy_class = getattr(module, name)
+                        break
+                        
+                if strategy_class:
+                    self.strategies[symbol] = strategy_class(cfg)
+                else:
+                    log.error(f"engine.init_error", msg=f"No matching strategy class found for {symbol} in {module_path}")
+            except Exception as e:
+                log.error(f"engine.import_error", error=str(e), symbol=symbol)
+                
         # Track daily stats
         self.daily_stats: dict[str, dict] = {
             symbol: {"trades": 0, "wins": 0, "total_pnl": 0.0}
