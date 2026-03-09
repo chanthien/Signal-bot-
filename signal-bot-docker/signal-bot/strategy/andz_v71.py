@@ -145,9 +145,9 @@ class AndzV71Strategy:
         low = float(bar["low"])
         open_price = float(bar["open"])
 
-        ema50 = float(bar["ema50"])
+        ema10 = float(bar["ema10"])
+        ema25 = float(bar["ema25"])
         ema100 = float(bar["ema100"])
-        ema200 = float(bar["ema200"])
         adx = float(bar["adx"])
         rsi = float(bar["rsi"])
 
@@ -161,12 +161,13 @@ class AndzV71Strategy:
 
         # ── Entry Conditions ───────────────────────────────────────────
 
-        # EMA Crossovers
-        ema_cross_long = (ema50 > ema100) and (float(prev["ema50"]) <= float(prev["ema100"]))
-        ema_cross_short = (ema50 < ema100) and (float(prev["ema50"]) >= float(prev["ema100"]))
+        # EMA Crossovers (Fast over Medium)
+        ema_cross_long = (ema10 > ema25) and (float(prev["ema10"]) <= float(prev["ema25"]))
+        ema_cross_short = (ema10 < ema25) and (float(prev["ema10"]) >= float(prev["ema25"]))
 
-        # Strong uptrend filter (for longs only)
-        strong_uptrend = (ema50 > ema100 > ema200) and (close > ema200)
+        # Strong trend filter (Price above/below Slow EMA)
+        strong_uptrend = (ema10 > ema25 > ema100) and (close > ema100)
+        strong_downtrend = (ema10 < ema25 < ema100) and (close < ema100)
 
         # ADX filter (>=15) - TRENDING MARKET ONLY
         adx_filter = adx >= 15
@@ -178,9 +179,9 @@ class AndzV71Strategy:
         rsi_long = 50 < rsi < 70
         rsi_short = 30 < rsi < 50
 
-        # Price position
-        price_above = close > ema50 * 1.001
-        price_below = close < ema50 * 0.999
+        # Price position relative to Medium EMA
+        price_above = close > ema25 * 1.001
+        price_below = close < ema25 * 0.999
 
         # Combine all conditions
         long_entry = (
@@ -198,6 +199,7 @@ class AndzV71Strategy:
             adx_filter and
             volume_spike and
             rsi_short and
+            strong_downtrend and
             price_below and
             active_hours
         )
@@ -211,7 +213,7 @@ class AndzV71Strategy:
             if long_entry:
                 signal = self._build_signal(
                     "LONG", "LONG", close, atr, atr_ratio,
-                    (close - ema200) / atr if atr > 0 else 0.0,
+                    (close - ema100) / atr if atr > 0 else 0.0,
                     abs(close - open_price) / atr if atr > 0 else 0.5,
                     0.0, layer=1, exhaustion=False
                 )
@@ -221,7 +223,7 @@ class AndzV71Strategy:
             if short_entry:
                 signal = self._build_signal(
                     "SHORT", "SHORT", close, atr, atr_ratio,
-                    (ema200 - close) / atr if atr > 0 else 0.0,
+                    (ema100 - close) / atr if atr > 0 else 0.0,
                     abs(close - open_price) / atr if atr > 0 else 0.5,
                     0.0, layer=1, exhaustion=False
                 )
@@ -233,8 +235,12 @@ class AndzV71Strategy:
         # ── IN POSITION ───────────────────────────────────────────────
 
         # Calculate time in trade
+        current_time = bar.get("date", datetime.now())
         if state.entry_time:
-            time_in_trade = (bar.get("date", datetime.now()) - state.entry_time).total_seconds() / 3600
+            # Ensure comparison is possible (handled by standard bots)
+            if isinstance(state.entry_time, str):
+                 state.entry_time = datetime.fromisoformat(state.entry_time.replace("Z", "+00:00"))
+            time_in_trade = (current_time - state.entry_time).total_seconds() / 3600
         else:
             time_in_trade = 0
         state.time_in_trade = time_in_trade
@@ -265,7 +271,7 @@ class AndzV71Strategy:
         if state.direction == "LONG" and short_entry:
             return self._build_signal(
                 "FLAT", "SHORT", close, atr, atr_ratio,
-                (ema200 - close) / atr if atr > 0 else 0.0,
+                (ema100 - close) / atr if atr > 0 else 0.0,
                 abs(close - open_price) / atr if atr > 0 else 0.5,
                 0.0, exhaustion=False
             )
@@ -273,21 +279,21 @@ class AndzV71Strategy:
         if state.direction == "SHORT" and long_entry:
             return self._build_signal(
                 "FLAT", "LONG", close, atr, atr_ratio,
-                (close - ema200) / atr if atr > 0 else 0.0,
+                (close - ema100) / atr if atr > 0 else 0.0,
                 abs(close - open_price) / atr if atr > 0 else 0.5,
                 0.0, exhaustion=False
             )
 
         # Momentum reversal exit
         if state.direction == "LONG":
-            if ema50 < ema100 and adx < 15:
+            if ema10 < ema25 and adx < 15:
                 return self._build_signal(
                     "FLAT", "", close, atr, atr_ratio, 0.0, 0.0, 0.0,
                     exhaustion=True
                 )
 
         if state.direction == "SHORT":
-            if ema50 > ema100 and adx < 15:
+            if ema10 > ema25 and adx < 15:
                 return self._build_signal(
                     "FLAT", "", close, atr, atr_ratio, 0.0, 0.0, 0.0,
                     exhaustion=True
@@ -309,7 +315,7 @@ class AndzV71Strategy:
                 if close < state.peak_price or state.peak_price == 0:
                     state.peak_price = close
 
-        # Trailing stop exit
+        # Trailing stop exit (local bypass, though engine normally handles this)
         if state.trail_active:
             if state.direction == "LONG":
                 trail_dist = atr * 0.5
@@ -326,11 +332,6 @@ class AndzV71Strategy:
                         "FLAT", "", close, atr, atr_ratio, 0.0, 0.0, 0.0,
                         exhaustion=False
                     )
-
-        # Partial take-profit levels
-        # TP1: +1% (exit 50%)
-        # TP2: +2% (exit 30% of remaining)
-        # Remaining 20% trails
 
         return None
 
@@ -353,9 +354,10 @@ class AndzV71Strategy:
 
         # ── Dynamic SL/TP ──────────────────────────────────────────────
         # SL based on ADX strength
-        if self.cfg.adx > 25:
+        adx_val = getattr(self.cfg, 'adx', 20) # Fallback if not injected correctly
+        if adx_val > 25:
             sl_mult = 1.8
-        elif self.cfg.adx > 20:
+        elif adx_val > 20:
             sl_mult = 1.5
         else:
             sl_mult = 1.3
@@ -383,7 +385,7 @@ class AndzV71Strategy:
         # ── Confidence score ─────────────────────────────────────────
         confidence = self._calc_confidence(
             atr_ratio, candle_body_ratio, breakout_gap,
-            layer, rr, action
+            layer, rr, action, exhaustion
         )
 
         self.state.last_signal = action
@@ -404,7 +406,7 @@ class AndzV71Strategy:
             layer=layer,
             avg_entry=self.state.avg_entry,
             exhaustion=exhaustion,
-            time_in_trade=self.state.time_in_trade if hasattr(self.state, 'time_in_trade') else 0.0
+            time_in_trade=getattr(self.state, 'time_in_trade', 0.0)
         )
 
     # ── Confidence score ──────────────────────────────────────────────────
@@ -417,6 +419,7 @@ class AndzV71Strategy:
         layer: int,
         rr: float,
         action: str,
+        exhaustion: bool = False
     ) -> float:
         """
         Bayesian multiplicative confidence for ANDZ V7.1
@@ -425,11 +428,12 @@ class AndzV71Strategy:
         p = 0.70
 
         # Factor 1: ADX strength (critical filter)
-        if self.cfg.adx >= 25:
+        adx_val = getattr(self.cfg, 'adx', 20)
+        if adx_val >= 25:
             p *= 1.15  # Strong trend
-        elif self.cfg.adx >= 20:
+        elif adx_val >= 20:
             p *= 1.08  # Moderate trend
-        elif self.cfg.adx >= 15:
+        elif adx_val >= 15:
             p *= 1.0   # Minimum threshold
         else:
             p *= 0.7   # Should not happen due to ADX filter
@@ -460,7 +464,7 @@ class AndzV71Strategy:
             p *= 0.85  # Exhaustion exit
 
         # Hard floor/ceiling
-        p = max(0.55, min(p, 0.92))
+        p = max(0.5, min(p, 0.92))
 
         return round(p, 3)
 
@@ -469,10 +473,10 @@ class AndzV71Strategy:
     def _calc_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
 
-        # EMAs
-        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        # EMAs 10/25/100
+        df["ema10"] = df["close"].ewm(span=10, adjust=False).mean()
+        df["ema25"] = df["close"].ewm(span=25, adjust=False).mean()
         df["ema100"] = df["close"].ewm(span=100, adjust=False).mean()
-        df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
 
         # ADX
         df["adx"] = self._adx(df, 14)

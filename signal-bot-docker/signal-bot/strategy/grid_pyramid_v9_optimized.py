@@ -84,6 +84,7 @@ class Signal:
     avg_entry: float = 0.0
     size: float  = 0.0    # qty tính từ risk_pct
     reason: str  = ""
+    exhaustion: bool = False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -97,6 +98,10 @@ class AssetState:
     entry_prices: list = field(default_factory=list)
     sizes: list        = field(default_factory=list)
     last_signal: str   = ""
+
+    # Trailing SL tracking
+    peak_price: float  = 0.0
+    trail_active: bool = False
 
     # DD tracking
     daily_date: date       = field(default_factory=date.today)
@@ -125,6 +130,8 @@ class AssetState:
         self.layers    = 0
         self.entry_prices.clear()
         self.sizes.clear()
+        self.peak_price   = 0.0
+        self.trail_active = False
 
     def new_day_check(self, equity: float):
         today = date.today()
