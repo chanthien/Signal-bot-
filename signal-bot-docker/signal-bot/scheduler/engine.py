@@ -11,10 +11,10 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED, MEME_ASSETS
+from config.settings import ASSETS, AssetConfig, CANDLE_INTERVAL, CANDLE_LIMIT, EXECUTION_ENABLED, MEME_ASSETS, CORE_ASSETS
 from execution.gateway import gateway
 from notifier.telegram import notifier
-from strategy.grid_pyramid import GridPyramidStrategy, Signal, AssetState
+from strategy.grid_pyramid_v9_optimized import GridPyramidStrategy, Signal, AssetState
 from utils.logger import log
 
 
@@ -66,6 +66,10 @@ class TradingEngine:
         log.info("engine.started", assets=list(ASSETS.keys()), execution_enabled=self.execution_enabled)
         await notifier.bot_started(list(ASSETS.keys()))
 
+        # ── Position reconciliation on startup ────────────────────────
+        if self.execution_enabled:
+            await self._reconcile_positions()
+
         # Chạy ngay lần đầu, sau đó đợi mỗi phút
         await self._run_all()
 
@@ -81,6 +85,45 @@ class TradingEngine:
         self._running = False
         self.execution_enabled = EXECUTION_ENABLED
         log.info("engine.stopped")
+
+    # ── Position reconciliation ────────────────────────────────────────
+
+    async def _reconcile_positions(self) -> None:
+        """Sync internal state with actual BingX positions on startup."""
+        for symbol, cfg in ASSETS.items():
+            if symbol in MEME_ASSETS:
+                continue  # meme = signal-only, no reconciliation needed
+            try:
+                positions = await gateway.get_positions(symbol)
+                strategy = self.strategies.get(symbol)
+                if not strategy:
+                    continue
+                state = strategy.state
+
+                for pos in positions:
+                    amt = float(pos.get("positionAmt", 0))
+                    if amt == 0:
+                        continue
+                    p_side = pos.get("positionSide", "").upper()
+                    avg_price = float(pos.get("avgPrice", 0))
+                    
+                    if p_side in ("LONG", "SHORT") and abs(amt) > 0:
+                        # We have an open position on exchange — sync state
+                        if state.direction == "" or state.layers == 0:
+                            state.direction = p_side
+                            state.layers = 1
+                            state.entry_prices = [avg_price]
+                            state.sizes = [abs(amt)]
+                            state.peak_price = avg_price
+                            state.trail_active = False
+                            log.info("engine.reconcile_synced",
+                                     symbol=symbol, direction=p_side,
+                                     avg_price=avg_price, qty=abs(amt))
+                            await notifier.system_alert(
+                                f"♻️ Synced {symbol}: {p_side} @ {avg_price}, qty={abs(amt)}"
+                            )
+            except Exception as e:
+                log.error("engine.reconcile_error", symbol=symbol, error=str(e))
 
     # ── Per-bar execution ─────────────────────────────────────────────────
 
@@ -159,9 +202,11 @@ class TradingEngine:
                     self._record_trade(symbol, pnl_pct)
                 state.reset()
             reason = "Trend End" if signal.direction == "" else "Reversal"
+            strategy_name = strategy.__class__.__name__
             await notifier.send_close(
                 display_name, state.direction or signal.direction,
-                reason, pnl_pct if state.layers > 0 else 0.0, executed
+                reason, pnl_pct if state.layers > 0 else 0.0, executed,
+                strategy_name=strategy_name
             )
             # If reversal, trigger new entry
             if signal.direction in ("LONG", "SHORT"):
@@ -176,7 +221,15 @@ class TradingEngine:
 
         # ── ADD LAYER ─────────────────────────────────────────────────
         if signal.action == "ADD":
-            qty = self._calc_qty(cfg, signal.price, layer=signal.layer)
+            # ── Layer overflow guard ──────────────────────────────
+            if state.layers >= cfg.max_layers:
+                log.warning("engine.add_rejected_max_layers",
+                            symbol=symbol, layers=state.layers,
+                            max_layers=cfg.max_layers)
+                return
+
+            qty = self._calc_qty(cfg, signal.price, layer=signal.layer,
+                                 confidence=signal.confidence)
             p_side = "LONG" if signal.direction == "LONG" else "SHORT"
             side   = "BUY"  if signal.direction == "LONG" else "SELL"
             order  = await gateway.place_order(symbol, side, p_side, qty)
@@ -190,22 +243,26 @@ class TradingEngine:
             if order:
                 executed = True
                 order_id = str(order.get("orderId", ""))
-                # Update SL only if order succeeded (or we could always try to update)
-                await self._update_sl(symbol, state, signal.sl_price, qty)
-            await notifier.send_add_layer(signal, display_name, executed)
+                # Update hard SL for entire position
+                await self._update_hard_sl(symbol, state, signal.sl_price)
+            await notifier.send_add_layer(signal, display_name, executed, strategy_name=strategy.__class__.__name__)
             return
 
         # ── REDUCE ────────────────────────────────────────────────────
         if signal.action == "REDUCE":
             to_close = min(2, state.layers - 1)
-            for _ in range(to_close):
+            log.info("engine.reduce_start", symbol=symbol,
+                     layers=state.layers, to_close=to_close)
+            for i in range(to_close):
                 if len(state.sizes) <= 1:
+                    log.info("engine.reduce_skip_core", symbol=symbol)
                     break
                 qty    = state.sizes[-1]
                 p_side = "LONG" if signal.direction == "LONG" else "SHORT"
                 side   = "SELL" if signal.direction == "LONG" else "BUY"
+                # Remove reduce_only=True to prevent BingX API rejection in Hedge mode
                 order  = await gateway.place_order(
-                    symbol, side, p_side, qty, reduce_only=True
+                    symbol, side, p_side, qty, reduce_only=False
                 )
                 
                 # State update happens regardless of order execution success
@@ -215,7 +272,17 @@ class TradingEngine:
                 
                 if order:
                     executed = True
-            await notifier.send_reduce(signal, display_name, executed)
+                    log.info("engine.reduce_executed", symbol=symbol,
+                             layer_closed=i+1, qty=qty)
+                else:
+                    log.warning("engine.reduce_order_failed", symbol=symbol,
+                                layer_closed=i+1, qty=qty)
+
+            # Update hard SL for remaining position
+            if executed and state.layers > 0:
+                await self._update_hard_sl(symbol, state, signal.sl_price)
+
+            await notifier.send_reduce(signal, display_name, executed, strategy_name=strategy.__class__.__name__)
             return
 
         # ── WEAK TREND warning ────────────────────────────────────────
@@ -240,7 +307,8 @@ class TradingEngine:
             if was_open:
                 self._record_trade(signal.symbol, pnl_pct)
             state.reset()
-            await notifier.send_close(display_name, old_direction, "Trend End" if signal.direction == "" else "Reversal", pnl_pct if was_open else 0.0, False)
+            strategy_name = strategy.__class__.__name__
+            await notifier.send_close(display_name, old_direction, "Trend End" if signal.direction == "" else "Reversal", pnl_pct if was_open else 0.0, False, strategy_name=strategy_name)
             if signal.direction in ("LONG", "SHORT"):
                 state.direction = signal.direction
                 state.layers = 1
@@ -248,7 +316,7 @@ class TradingEngine:
                 state.sizes = [self._calc_qty(cfg, signal.price, layer=0)]
                 state.peak_price = signal.price
                 state.trail_active = False
-                await notifier.send_signal(signal, display_name, False, "")
+                await notifier.send_signal(signal, display_name, False, "", strategy_name=strategy_name)
             return
 
         if signal.action in ("LONG", "SHORT"):
@@ -258,7 +326,7 @@ class TradingEngine:
             state.sizes = [self._calc_qty(cfg, signal.price, layer=0)]
             state.peak_price = signal.price
             state.trail_active = False
-            await notifier.send_signal(signal, display_name, False, "")
+            await notifier.send_signal(signal, display_name, False, "", strategy_name=strategy.__class__.__name__)
             return
 
         if signal.action == "ADD":
@@ -267,7 +335,7 @@ class TradingEngine:
             state.entry_prices.append(signal.price)
             state.sizes.append(qty)
             state.trail_active = False
-            await notifier.send_add_layer(signal, display_name, False)
+            await notifier.send_add_layer(signal, display_name, False, strategy_name=strategy.__class__.__name__)
             return
 
         if signal.action == "REDUCE":
@@ -278,7 +346,7 @@ class TradingEngine:
                 state.layers -= 1
                 state.entry_prices.pop()
                 state.sizes.pop()
-            await notifier.send_reduce(signal, display_name, False)
+            await notifier.send_reduce(signal, display_name, False, strategy_name=strategy.__class__.__name__)
             return
 
         if signal.action == "WEAK_TREND":
@@ -294,7 +362,8 @@ class TradingEngine:
     ) -> None:
         symbol   = signal.symbol
         state    = strategy.state
-        qty      = self._calc_qty(cfg, signal.price, layer=0)
+        qty      = self._calc_qty(cfg, signal.price, layer=0,
+                                  confidence=signal.confidence)
         p_side   = "LONG" if signal.direction == "LONG" else "SHORT"
         side     = "BUY"  if signal.direction == "LONG" else "SELL"
 
@@ -313,10 +382,10 @@ class TradingEngine:
         if order:
             executed = True
             order_id = str(order.get("orderId", ""))
-            # Place SL only if order succeeds
-            await self._update_sl(symbol, state, signal.sl_price, qty)
+            # Place hard SL on exchange (persists even if VPS goes down)
+            await self._update_hard_sl(symbol, state, signal.sl_price)
 
-        await notifier.send_signal(signal, cfg.display_name, executed, order_id)
+        await notifier.send_signal(signal, cfg.display_name, executed, order_id, strategy_name=strategy.__class__.__name__)
 
     # ── SL management ─────────────────────────────────────────────────────
 
@@ -326,6 +395,25 @@ class TradingEngine:
         await gateway.cancel_all_orders(symbol)
         p_side = "LONG" if state.direction == "LONG" else "SHORT"
         await gateway.set_sl(symbol, p_side, sl_price, qty)
+
+    async def _update_hard_sl(self, symbol: str, state: AssetState,
+                               sl_price: float) -> None:
+        """
+        Place/update hard SL on exchange for ENTIRE position.
+        This SL persists on BingX even if the bot/VPS goes offline.
+        """
+        total_qty = state.total_size
+        if total_qty <= 0:
+            return
+        await gateway.cancel_all_orders(symbol)
+        p_side = "LONG" if state.direction == "LONG" else "SHORT"
+        result = await gateway.set_sl(symbol, p_side, sl_price, total_qty)
+        if result:
+            log.info("engine.hard_sl_placed",
+                     symbol=symbol, sl_price=sl_price, qty=total_qty)
+        else:
+            log.warning("engine.hard_sl_failed",
+                        symbol=symbol, sl_price=sl_price)
 
     async def update_trailing_sl(self, symbol: str, cfg: AssetConfig) -> None:
         """
@@ -385,9 +473,12 @@ class TradingEngine:
         else:
             new_sl = state.peak_price * (1 + dist_pct)
 
-        # Get current positions and total qty
-        positions = await gateway.get_positions(symbol)
-        total_qty = sum(abs(float(p.get("positionAmt", 0))) for p in positions)
+        # Get actual position qty from exchange for accuracy
+        total_qty = state.total_size
+        if total_qty <= 0:
+            # Fallback: query exchange
+            positions = await gateway.get_positions(symbol)
+            total_qty = sum(abs(float(p.get("positionAmt", 0))) for p in positions)
 
         if total_qty > 0:
             await self._update_sl(symbol, state, new_sl, total_qty)
@@ -396,19 +487,33 @@ class TradingEngine:
 
     # ── Helpers ───────────────────────────────────────────────────────────
 
-    def _calc_qty(self, cfg: AssetConfig, price: float, layer: int) -> float:
-        """Calculate order quantity for layer."""
+    def _calc_qty(self, cfg: AssetConfig, price: float, layer: int,
+                  confidence: float = 1.0) -> float:
+        """
+        Calculate order quantity for layer.
+        For core assets (BTC, ETH, XAUT): scale by confidence.
+        e.g. confidence=0.58 → qty *= 0.58
+        """
         if cfg.quantity > 0:
             base = cfg.quantity
         else:
             base = cfg.usdt_per_trade / price * cfg.leverage
 
-        qty = base * (cfg.geo_mult ** layer)
+        if cfg.symbol in CORE_ASSETS and layer > 0:
+            # Core layer is 3x Add layer size for core assets
+            qty = base / 3.0
+        else:
+            qty = base * (cfg.geo_mult ** layer)
+
+        # ── Confidence-based sizing for core assets ──
+        if cfg.symbol in CORE_ASSETS and confidence > 0:
+            qty *= confidence
+
         # Round to reasonable precision
         if price >= 1000:
-            return round(qty, 3)
+            return round(qty, 4)
         elif price >= 1:
-            return round(qty, 2)
+            return round(qty, 3)
         else:
             return round(qty, 0)
 

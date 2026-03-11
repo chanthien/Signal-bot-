@@ -35,11 +35,11 @@ EXECUTOR_BASE_URL= _env("EXECUTOR_BASE_URL", "")
 EXECUTION_ENABLED= _env("EXECUTION_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 # ── Strategy module (swap khi đổi algo) ───────────────────
-STRATEGY_MODULE  = "strategy.grid_pyramid"
+STRATEGY_MODULE  = "strategy.grid_pyramid_v9_optimized"
 
-# ── Global H1 defaults (override per-asset trong AssetConfig) ─
-CANDLE_INTERVAL  = "1h"
-CANDLE_LIMIT     = 100    # số nến fetch mỗi lần
+# ── Global M15 defaults (override per-asset trong AssetConfig) ─
+CANDLE_INTERVAL  = "15m"
+CANDLE_LIMIT     = 300    # số nến fetch mỗi lần (tăng lên 300 để EMA100 hội tụ)
 ENABLE_MEME_GROUP = _env("ENABLE_MEME_GROUP", "false").lower() in {"1", "true", "yes", "on"}
 
 
@@ -52,7 +52,7 @@ class AssetConfig:
     quantity:        float = 0.0    # contract size (0 = tự tính từ usdt_per_trade)
     usdt_per_trade:  float = 10.0   # USD mỗi lệnh core (nếu quantity=0)
     pip_value:       float = 0.1    # giá trị 1 pip (price point)
-    strategy_module: str   = "strategy.grid_pyramid" # Add strategy override module per asset
+    strategy_module: str   = "strategy.grid_pyramid_v9_optimized" # Add strategy override module per asset
     account_equity:  float = 1000.0 # base account equity for risk
     risk_pct:        float = 0.01   # base max risk per trade
 
@@ -90,7 +90,7 @@ CORE_ASSETS: dict[str, AssetConfig] = {
         symbol        = "XAUT-USDT",
         display_name  = "XAU/USDT (Vàng)",
         leverage      = 40,
-        quantity      = 0.0125, # 0.05 / 4
+        quantity      = 0.03, # Lệnh core sẽ là 0.03, lệnh add là 0.01
         pip_value     = 0.1,
         strategy_module = "strategy.andz_v71",
     ),
@@ -98,7 +98,7 @@ CORE_ASSETS: dict[str, AssetConfig] = {
         symbol        = "BTC-USDT",
         display_name  = "BTC/USDT",
         leverage      = 40,
-        quantity      = 0.0025, # 0.01 / 4
+        quantity      = 0.0003, # Lệnh core sẽ là 0.0003, lệnh add là 0.0001
         pip_value     = 1.0,
         strategy_module = "strategy.grid_pyramid_v9_optimized",
     ),
@@ -106,7 +106,7 @@ CORE_ASSETS: dict[str, AssetConfig] = {
         symbol        = "ETH-USDT",
         display_name  = "ETH/USDT",
         leverage      = 40,
-        quantity      = 0.025, # 0.1 / 4
+        quantity      = 0.03, # Lệnh core sẽ là 0.03, lệnh add là 0.01
         pip_value     = 0.1,
         strategy_module = "strategy.andz_v80_strategy",
     ),
@@ -116,19 +116,26 @@ CORE_ASSETS: dict[str, AssetConfig] = {
 # ── Meme/alt group (bật qua ENABLE_MEME_GROUP=true) ─────────
 
 MEME_ASSETS: dict[str, AssetConfig] = {
-    "ARC-USDT": AssetConfig(symbol="ARC-USDT", display_name="ARC/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "MYX-USDT": AssetConfig(symbol="MYX-USDT", display_name="MYX/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "POWER-USDT": AssetConfig(symbol="POWER-USDT", display_name="POWER/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "PHA-USDT": AssetConfig(symbol="PHA-USDT", display_name="PHA/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "B-USDT": AssetConfig(symbol="B-USDT", display_name="B/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "BABY-USDT": AssetConfig(symbol="BABY-USDT", display_name="BABY/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "PIPPIN-USDT": AssetConfig(symbol="PIPPIN-USDT", display_name="PIPPIN/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "ADA-USDT": AssetConfig(symbol="ADA-USDT", display_name="ADA/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "MAGIC-USDT": AssetConfig(symbol="MAGIC-USDT", display_name="MAGIC/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "RIVER-USDT": AssetConfig(symbol="RIVER-USDT", display_name="RIVER/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "TAU-USDT": AssetConfig(symbol="TAU-USDT", display_name="TAU/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "DAM-USDT": AssetConfig(symbol="DAM-USDT", display_name="DAM/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
-    "EUL-USDT": AssetConfig(symbol="EUL-USDT", display_name="EUL/USDT", leverage=3, usdt_per_trade=5.0, pip_value=0.0001),
+    "ARC-USDT": AssetConfig(symbol="ARC-USDT", display_name="ARC/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "MYX-USDT": AssetConfig(symbol="MYX-USDT", display_name="MYX/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "POWER-USDT": AssetConfig(symbol="POWER-USDT", display_name="POWER/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "PHA-USDT": AssetConfig(symbol="PHA-USDT", display_name="PHA/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "B-USDT": AssetConfig(symbol="B-USDT", display_name="B/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "BABY-USDT": AssetConfig(symbol="BABY-USDT", display_name="BABY/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "PIPPIN-USDT": AssetConfig(symbol="PIPPIN-USDT", display_name="PIPPIN/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "ADA-USDT": AssetConfig(symbol="ADA-USDT", display_name="ADA/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "MAGIC-USDT": AssetConfig(symbol="MAGIC-USDT", display_name="MAGIC/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "DAM-USDT": AssetConfig(symbol="DAM-USDT", display_name="DAM/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "PUMP-USDT": AssetConfig(symbol="PUMP-USDT", display_name="PUMP/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.000001),
+    "RESOLV-USDT": AssetConfig(symbol="RESOLV-USDT", display_name="RESOLV/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "PLUME-USDT": AssetConfig(symbol="PLUME-USDT", display_name="PLUME/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "BIO-USDT": AssetConfig(symbol="BIO-USDT", display_name="BIO/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "CFX-USDT": AssetConfig(symbol="CFX-USDT", display_name="CFX/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "MOVE-USDT": AssetConfig(symbol="MOVE-USDT", display_name="MOVE/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.00001),
+    "PI-USDT": AssetConfig(symbol="PI-USDT", display_name="PI/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.01),
+    "OKB-USDT": AssetConfig(symbol="OKB-USDT", display_name="OKB/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.01),
+    "SUPER-USDT": AssetConfig(symbol="SUPER-USDT", display_name="SUPER/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
+    "COOKIE-USDT": AssetConfig(symbol="COOKIE-USDT", display_name="COOKIE/USDT", leverage=3, quantity=0.0, usdt_per_trade=20.0, pip_value=0.0001),
 }
 
 ASSETS: dict[str, AssetConfig] = {**CORE_ASSETS, **(MEME_ASSETS if ENABLE_MEME_GROUP else {})}

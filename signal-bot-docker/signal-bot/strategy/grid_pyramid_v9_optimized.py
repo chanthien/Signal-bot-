@@ -183,7 +183,12 @@ class GridPyramidStrategy:
         ema20  = float(bar.ema20)
         ma10   = float(bar.ma10)
         ma25   = float(bar.ma25)
+        ema200 = float(bar.ema200)  # [ADD MTF] H1 EMA50 equivalent = M15 EMA200
         atr    = float(bar.atr)
+
+        # [ADD MTF] H1 Trend definitions
+        h1_long = close > ema200
+        h1_short = close < ema200
 
         atr_ma    = float(df.atr.rolling(20).mean().iloc[-1])
         atr_ratio = atr / atr_ma if atr_ma > 0 else 1.0
@@ -227,28 +232,41 @@ class GridPyramidStrategy:
         grid = atr * cfg.grid_atr_mult
 
         # ======================================================
-        # ENTRY
+        # ENTRY — lọc bằng H1 trend
         # ======================================================
 
         if state.direction == "":
 
-            if breakout_long:
+            if breakout_long and h1_long:
                 return self._make_signal("LONG", "LONG", close, atr, atr_ratio, momentum, 1, sl_dist, "breakout")
 
-            if breakout_short:
+            if breakout_short and h1_short:
                 return self._make_signal("SHORT", "SHORT", close, atr, atr_ratio, momentum, 1, sl_dist, "breakout")
 
             return None
 
         # ======================================================
-        # REVERSAL — giữ nguyên v9
+        # H1 TREND REVERSAL — Đóng tất cả nếu H1 đảo chiều
+        # ======================================================
+        if state.direction == "LONG" and h1_short:
+            return self._make_signal("FLAT", "SHORT", close, atr, atr_ratio, momentum, 1, sl_dist, "h1_reversal")
+
+        if state.direction == "SHORT" and h1_long:
+            return self._make_signal("FLAT", "LONG", close, atr, atr_ratio, momentum, 1, sl_dist, "h1_reversal")
+
+        # ======================================================
+        # REVERSAL M15 — Chỉ đóng lệnh ADD nếu H1 vẫn cùng trend
         # ======================================================
 
         if state.direction == "LONG" and breakout_short:
-            return self._make_signal("FLAT", "SHORT", close, atr, atr_ratio, momentum, 1, sl_dist, "reversal")
+            if state.layers > 1:
+                return self._make_signal("REDUCE", "LONG", close, atr, atr_ratio, momentum, state.layers, sl_dist, "mtf_reduce")
+            # Nếu chỉ còn lệnh Core, giữ nguyên cho đến khi H1 đảo chiều (h1_short)
 
         if state.direction == "SHORT" and breakout_long:
-            return self._make_signal("FLAT", "LONG", close, atr, atr_ratio, momentum, 1, sl_dist, "reversal")
+            if state.layers > 1:
+                return self._make_signal("REDUCE", "SHORT", close, atr, atr_ratio, momentum, state.layers, sl_dist, "mtf_reduce")
+            # Nếu chỉ còn lệnh Core, giữ nguyên cho đến khi H1 đảo chiều (h1_long)
 
         # ======================================================
         # PYRAMID ADD — [FIX 3] micro-pullback dùng recent window
@@ -445,6 +463,7 @@ class GridPyramidStrategy:
         df["ema20"] = df.close.ewm(span=20, adjust=False).mean()
         df["ma10"]  = df.close.rolling(10).mean()
         df["ma25"]  = df.close.rolling(25).mean()
+        df["ema200"]= df.close.ewm(span=200, adjust=False).mean() # MTF H1 approx
         return df
 
     def _atr(self, df, n):
