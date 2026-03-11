@@ -499,23 +499,35 @@ class TradingEngine:
         else:
             base = cfg.usdt_per_trade / price * cfg.leverage
 
-        if cfg.symbol in CORE_ASSETS and layer > 0:
+        if cfg.symbol in CORE_ASSETS:
             # Core layer is 3x Add layer size for core assets
-            qty = base / 3.0
+            if layer > 0:
+                qty = base / 3.0
+            else:
+                qty = base
+            # Skip confidence scaling for fixed minimal sizes to maintain strict 3x ratio and avoid hitting < 0.0001 error
         else:
             qty = base * (cfg.geo_mult ** layer)
+            if confidence > 0:
+                qty *= confidence
 
-        # ── Confidence-based sizing for core assets ──
-        if cfg.symbol in CORE_ASSETS and confidence > 0:
-            qty *= confidence
-
-        # Round to reasonable precision
-        if price >= 1000:
-            return round(qty, 4)
-        elif price >= 1:
-            return round(qty, 3)
+        # Apply strict precision rounding and HARD minimums to prevent API `qty=0` rejection
+        if "BTC" in cfg.symbol:
+            qty = round(qty, 4)
+            return max(qty, 0.0001)
+        elif "ETH" in cfg.symbol:
+            qty = round(qty, 2)
+            return max(qty, 0.01)
+        elif "XAUT" in cfg.symbol:
+            qty = round(qty, 2)
+            return max(qty, 0.01)
         else:
-            return round(qty, 0)
+            if price >= 1000:
+                return round(qty, 4)
+            elif price >= 1:
+                return round(qty, 3)
+            else:
+                return round(qty, 0)
 
     def _estimate_pnl_pct(self, state: AssetState, current: float) -> float:
         if not state.avg_entry or state.avg_entry == 0:
