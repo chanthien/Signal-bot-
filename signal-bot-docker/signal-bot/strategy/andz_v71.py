@@ -148,8 +148,13 @@ class AndzV71Strategy:
         ema10 = float(bar["ema10"])
         ema25 = float(bar["ema25"])
         ema100 = float(bar["ema100"])
+        ema200 = float(bar["ema200"]) # [MTF]
         adx = float(bar["adx"])
         rsi = float(bar["rsi"])
+        
+        # [MTF] H1 Trend definitions
+        h1_long = close > ema200
+        h1_short = close < ema200
 
         volume_sma = float(bar["volume_sma"])
         volume = float(bar["volume"])
@@ -191,6 +196,7 @@ class AndzV71Strategy:
             rsi_long and
             strong_uptrend and
             price_above and
+            h1_long and
             active_hours
         )
 
@@ -201,6 +207,7 @@ class AndzV71Strategy:
             rsi_short and
             strong_downtrend and
             price_below and
+            h1_short and
             active_hours
         )
 
@@ -266,6 +273,18 @@ class AndzV71Strategy:
                         "FLAT", "", close, atr, atr_ratio, 0.0, 0.0, 0.0,
                         exhaustion=False
                     )
+
+        # ── H1 TREND REVERSAL ──
+        if state.direction == "LONG" and h1_short:
+             return self._build_signal(
+                "FLAT", "SHORT", close, atr, atr_ratio, 0.0, 0.0, 0.0,
+                exhaustion=False
+            )
+        if state.direction == "SHORT" and h1_long:
+             return self._build_signal(
+                "FLAT", "LONG", close, atr, atr_ratio, 0.0, 0.0, 0.0,
+                exhaustion=False
+            )
 
         # Reversal signals
         if state.direction == "LONG" and short_entry:
@@ -477,6 +496,7 @@ class AndzV71Strategy:
         df["ema10"] = df["close"].ewm(span=10, adjust=False).mean()
         df["ema25"] = df["close"].ewm(span=25, adjust=False).mean()
         df["ema100"] = df["close"].ewm(span=100, adjust=False).mean()
+        df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
 
         # ADX
         df["adx"] = self._adx(df, 14)

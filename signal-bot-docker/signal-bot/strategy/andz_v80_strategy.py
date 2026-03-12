@@ -12,7 +12,7 @@ from typing import Optional
 from datetime import datetime
 
 from config.settings import AssetConfig
-from strategy.grid_pyramid import Signal, AssetState
+from strategy.grid_pyramid_v9_optimized import Signal, AssetState
 
 
 class AndzV80Strategy:
@@ -29,33 +29,38 @@ class AndzV80Strategy:
 
     def process(self, df: pd.DataFrame) -> Optional[Signal]:
 
-        if len(df) < 200:
+        if len(df) < 100:
             return None
 
         df = self._indicators(df)
         bar = df.iloc[-1]
 
         close = float(bar.close)
-        ema50 = float(bar.ema50)
-        ema200 = float(bar.ema200)
+        ma25 = float(bar.ma25)
+        ema100 = float(bar.ema100)
+        ema200 = float(bar.ema200)  # [MTF] M15 EMA200
         adx = float(bar.adx)
         rsi = float(bar.rsi)
         atr = float(bar.atr)
 
+        # [MTF] H1 Trend definitions
+        h1_long = close > ema200
+        h1_short = close < ema200
+
         breakout_high = float(df.high.rolling(self.breakout_period).max().iloc[-2])
         breakout_low = float(df.low.rolling(self.breakout_period).min().iloc[-2])
 
-        trend_long = ema50 > ema200
-        trend_short = ema50 < ema200
+        trend_long = ema25 > ema100
+        trend_short = ema25 < ema100
 
-        pullback_long = close > ema50 and rsi > 50 and adx > 18
-        pullback_short = close < ema50 and rsi < 50 and adx > 18
+        pullback_long = close > ema25 and rsi > 50 and adx > 18
+        pullback_short = close < ema25 and rsi < 50 and adx > 18
 
         breakout_long = close > breakout_high
         breakout_short = close < breakout_low
 
-        long_entry = trend_long and (pullback_long or breakout_long)
-        short_entry = trend_short and (pullback_short or breakout_short)
+        long_entry = trend_long and (pullback_long or breakout_long) and h1_long
+        short_entry = trend_short and (pullback_short or breakout_short) and h1_short
 
         state = self.state
 
@@ -81,7 +86,11 @@ class AndzV80Strategy:
                     sl_price=sl, tp1_price=tp1, tp2_price=tp2, layer=1
                 )
 
-            return None
+        # --- H1 TREND REVERSAL ---
+        if state.direction == "LONG" and h1_short:
+            return self._build_signal("FLAT", "SHORT", close, atr, sl_price=close, tp1_price=close, tp2_price=close, layer=0)
+        if state.direction == "SHORT" and h1_long:
+            return self._build_signal("FLAT", "LONG", close, atr, sl_price=close, tp1_price=close, tp2_price=close, layer=0)
 
         avg = state.avg_entry
 
@@ -175,8 +184,9 @@ class AndzV80Strategy:
 
         df = df.copy()
 
-        df["ema50"] = df.close.ewm(span=50).mean()
-        df["ema200"] = df.close.ewm(span=200).mean()
+        df["ema25"] = df.close.ewm(span=25).mean()
+        df["ema100"] = df.close.ewm(span=100).mean()
+        df["ema200"] = df.close.ewm(span=200).mean() # MTF
 
         df["atr"] = self._atr(df, 14)
         df["rsi"] = self._rsi(df, 14)

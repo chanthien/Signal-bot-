@@ -235,10 +235,11 @@ class BingXClient:
         """
         url = f"{self.base}/openApi/swap/v2/trade/order"
         
-        # Determine correct positionSide and side for One-Way Mode
-        # In One-Way mode, positionSide MUST be "BOTH"
-        bingx_position_side = "BOTH"
-        bingx_side = side
+        # Use the provided position_side (LONG/SHORT) for Hedge Mode, or BOTH for One-Way
+        # Note: If the user is in One-Way mode, they should configure the bot accordingly.
+        # But hardcoding "BOTH" here broke standard Hedge Mode logic.
+        bingx_position_side = position_side.upper()
+        bingx_side = side.upper()
         
         params: dict = {
             "symbol": symbol,
@@ -283,11 +284,9 @@ class BingXClient:
             if amt == 0:
                 continue
             
-            # In One-Way mode, positionAmt is positive but positionSide is still LONG/SHORT.
-            # To close a SHORT position, we BUY. To close a LONG position, we SELL.
+            # In Hedge mode, we use the specific positionSide. In One-Way, it should be BOTH.
             side = "BUY" if p_side == "SHORT" else "SELL"
-            
-            result = await self.place_order(symbol, side, "BOTH", abs(amt), reduce_only=True)
+            result = await self.place_order(symbol, side, p_side, abs(amt), reduce_only=False)
             if not result:
                 success = False
         return success
@@ -299,11 +298,10 @@ class BingXClient:
         params = self._signed_params({
             "symbol": symbol,
             "side": side,
-            "positionSide": "BOTH",
+            "positionSide": position_side.upper(),
             "type": "STOP_MARKET",
             "stopPrice": sl_price,
             "quantity": quantity,
-            "reduceOnly": "true",
         })
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
