@@ -8,7 +8,7 @@ from typing import Optional
 import httpx
 
 from config.settings import TELEGRAM_TOKEN, CHANNEL_ID, MY_CHAT_ID
-from strategy.grid_pyramid import Signal
+from strategy.grid_pyramid_v9_optimized import Signal
 from utils.logger import log
 
 
@@ -87,8 +87,14 @@ class TelegramNotifier:
         return f"[{bar}] {_pct(confidence)}"
 
     async def send_signal(self, signal: Signal, display_name: str,
-                          executed: bool = False, order_id: str = "") -> None:
+                          executed: bool = False, order_id: str = "",
+                          strategy_name: str = "") -> None:
         """Send new LONG/SHORT signal to channel."""
+        # [FILTER] Only send if confidence >= 58%
+        if signal.confidence < 0.58:
+            log.info("telegram.signal_filtered", symbol=display_name, confidence=signal.confidence)
+            return
+
         d     = signal.direction
         emoji = "🟢" if d == "LONG" else "🔴"
         exec_str = "✅ Đã vào lệnh tự động" if executed else "⚡ Signal mới"
@@ -96,7 +102,7 @@ class TelegramNotifier:
         text = (
             f"{emoji} <b>{d} — {display_name}</b>\n"
             f"{'━' * 28}\n"
-            f"📊 Khung      : H1\n"
+            f"📊 Khung      : M15\n"
             f"💰 Giá vào    : <b>{_price(signal.price)}</b>\n"
             f"🎯 TP1        : {_price(signal.tp1_price)}  "
             f"<i>(+{abs(signal.tp1_price - signal.price) / signal.price * 100:.2f}%)</i>\n"
@@ -112,44 +118,23 @@ class TelegramNotifier:
             f"{'━' * 28}\n"
             f"🤖 {exec_str}"
             + (f"\n🆔 Order: <code>{order_id}</code>" if order_id else "")
+            + (f"\n🧠 Strat: <code>{strategy_name}</code>" if strategy_name else "")
         )
         await self._send(self.channel, text)
 
     async def send_add_layer(self, signal: Signal, display_name: str,
-                              executed: bool = False) -> None:
-        d     = signal.direction
-        emoji = "📈" if d == "LONG" else "📉"
-        text  = (
-            f"{emoji} <b>ADD LAYER {signal.layer} — {display_name}</b>\n"
-            f"{'━' * 28}\n"
-            f"💰 Giá add    : {_price(signal.price)}\n"
-            f"📊 Avg Entry  : {_price(signal.avg_entry)}\n"
-            f"🛑 New SL     : {_price(signal.sl_price)}\n"
-            f"🎯 TP1        : {_price(signal.tp1_price)}\n"
-            f"🔥 Tự tin     : {self._conf_bar(signal.confidence)}\n"
-            f"{'━' * 28}\n"
-            f"🤖 {'✅ Đã execute' if executed else '⚡ Add layer'} "
-            f"| Layer {signal.layer}/{5}"
-        )
-        await self._send(self.channel, text)
+                              executed: bool = False, strategy_name: str = "") -> None:
+        """[FILTERED] Skip add layer messages."""
+        return
 
     async def send_reduce(self, signal: Signal, display_name: str,
-                           executed: bool = False) -> None:
-        text = (
-            f"⚠️ <b>REDUCE — {display_name}</b>\n"
-            f"{'━' * 28}\n"
-            f"📉 Giá hiện tại : {_price(signal.price)}\n"
-            f"📊 Avg Entry    : {_price(signal.avg_entry)}\n"
-            f"🔄 Đóng bớt 2 lớp trẻ nhất\n"
-            f"💡 Giữ core layer, chờ trend tiếp tục\n"
-            f"{'━' * 28}\n"
-            f"🤖 {'✅ Đã execute' if executed else '⚡ Reduce'}"
-        )
-        await self._send(self.channel, text)
+                           executed: bool = False, strategy_name: str = "") -> None:
+        """[FILTERED] Skip reduce messages."""
+        return
 
     async def send_close(self, display_name: str, direction: str,
                           reason: str, pnl_pct: float,
-                          executed: bool = False) -> None:
+                          executed: bool = False, strategy_name: str = "") -> None:
         emoji  = "✅" if pnl_pct >= 0 else "❌"
         d_emoji= "🟢" if direction == "LONG" else "🔴"
         text   = (
@@ -160,6 +145,7 @@ class TelegramNotifier:
             f"💰 P&L    : <b>{'%.2f' % pnl_pct}%</b>\n"
             f"{'━' * 28}\n"
             f"🤖 {'✅ Đã đóng tự động' if executed else '⚡ Tín hiệu đóng'}"
+            + (f"\n🧠 Strat: <code>{strategy_name}</code>" if strategy_name else "")
         )
         await self._send(self.channel, text)
 
@@ -246,7 +232,7 @@ class TelegramNotifier:
         text = (
             f"🚀 <b>Signal Bot STARTED</b>\n"
             f"Assets: {', '.join(symbols)}\n"
-            f"Interval: H1\n"
+            f"Interval: 15m\n"
             f"Mode: Auto-execute BingX Futures"
         )
         await self._send(self.me, text)
