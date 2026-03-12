@@ -36,7 +36,7 @@ class AndzV80Strategy:
         bar = df.iloc[-1]
 
         close = float(bar.close)
-        ma25 = float(bar.ma25)
+        ema25 = float(bar.ema25)
         ema100 = float(bar.ema100)
         ema200 = float(bar.ema200)  # [MTF] M15 EMA200
         adx = float(bar.adx)

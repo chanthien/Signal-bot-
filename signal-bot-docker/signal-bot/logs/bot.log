@@ -17575,3 +17575,16 @@
 2026-03-12 08:28:01 | DEBUG    | [2m08:28:01[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mETH-USDT[0m
 2026-03-12 08:28:01 | DEBUG    | [2m08:28:01[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mBTC-USDT[0m
 2026-03-12 08:28:01 | INFO     | [2m08:28:01[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m08:29 UTC[0m [36mseconds[0m=[35m59[0m
+2026-03-12 08:29:02 | DEBUG    | [2m08:29:02[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mETH-USDT[0m
+2026-03-12 08:29:02 | DEBUG    | [2m08:29:02[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mXAUT-USDT[0m
+2026-03-12 08:29:02 | INFO     | [2m08:29:02[0m [[32m[1minfo     [0m] [1mengine.signal                 [0m [36maction[0m=[35mFLAT[0m [36mconfidence[0m=[35m0.594[0m [36mdirection[0m=[35mSHORT[0m [36mprice[0m=[35m69743.7[0m [36msymbol[0m=[35mBTC-USDT[0m
+2026-03-12 08:29:04 | INFO     | [2m08:29:04[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m08:30 UTC[0m [36mseconds[0m=[35m56[0m
+2026-03-12 08:30:02 | DEBUG    | [2m08:30:02[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mXAUT-USDT[0m
+2026-03-12 08:30:02 | DEBUG    | [2m08:30:02[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mETH-USDT[0m
+2026-03-12 08:30:02 | DEBUG    | [2m08:30:02[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mBTC-USDT[0m
+2026-03-12 08:30:02 | INFO     | [2m08:30:02[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m08:31 UTC[0m [36mseconds[0m=[35m58[0m
+2026-03-12 08:31:01 | DEBUG    | [2m08:31:01[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mXAUT-USDT[0m
+2026-03-12 08:31:01 | DEBUG    | [2m08:31:01[0m [[32m[1mdebug    [0m] [1mengine.no_signal              [0m [36msymbol[0m=[35mETH-USDT[0m
+2026-03-12 08:31:01 | INFO     | [2m08:31:01[0m [[32m[1minfo     [0m] [1mengine.signal                 [0m [36maction[0m=[35mFLAT[0m [36mconfidence[0m=[35m0.578[0m [36mdirection[0m=[35mLONG[0m [36mprice[0m=[35m69819.1[0m [36msymbol[0m=[35mBTC-USDT[0m
+2026-03-12 08:31:02 | INFO     | [2m08:31:02[0m [[32m[1minfo     [0m] [1mtelegram.signal_filtered      [0m [36mconfidence[0m=[35m0.578[0m [36msymbol[0m=[35mBTC/USDT[0m
+2026-03-12 08:31:02 | INFO     | [2m08:31:02[0m [[32m[1minfo     [0m] [1mengine.waiting                [0m [36mnext_run[0m=[35m08:32 UTC[0m [36mseconds[0m=[35m58[0m
