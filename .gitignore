@@ -1,7 +1,6 @@
 # Secrets - NEVER commit
-*.json
-!strategies/*.json
-config_*.json
+# Only commit configs with empty key/secret (dry-run)
+strategies/*.json
 
 # API keys, credentials
 *.env
