@@ -1,0 +1,31 @@
+# Secrets - NEVER commit
+*.json
+!strategies/*.json
+config_*.json
+
+# API keys, credentials
+*.env
+*.key
+*.pem
+*.secret
+
+# Data files (too large)
+data/
+backtest_results/
+hyperopt_results/
+plot/
+logs/
+notebooks/
+
+# Database
+*.sqlite
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
